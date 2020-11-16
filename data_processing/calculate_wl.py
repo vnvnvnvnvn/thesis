@@ -213,7 +213,7 @@ def label_distance(w1, w2):
         dot += w1[s] * w2[s]
     return dot / scale
 
-def build_database(path, n=1000):
+def build_database(path, n=10000):
     database = {}
     files = os.listdir(path)
     files.sort()

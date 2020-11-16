@@ -11,21 +11,26 @@ def top_distance(db, item, topk=10):
     return closest[:topk]
 
 def isin(top, name):
-    for k, v in top:
+    for idx, elem in enumerate(top):
+        k, v = elem
         if k == name:
             continue
         if k[:-2] == name[:-2]:
-            return True
-    return False
+            return idx
+    return None
 
 def main():
     db_name = "wl_db.pkl"
     handle = open(db_name, 'rb')
     db = pkl.load(handle)
     cnt = 0
-    for k, v in db.items()[:100]:
-        closest = top_distance(db, v, 5)
-        if isin(closest, k):
+    item_list = db.items()
+    random.shuffle(item_list)
+    for k, v in item_list[:100]:
+        closest = top_distance(db, v)
+        correct = isin(closest, k)
+        if correct is not None:
+            print(k+" "+closest[correct][0]+": "+str(closest[correct][1]))
             cnt += 1
     print(cnt*1.0/100)
 
