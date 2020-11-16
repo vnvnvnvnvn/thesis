@@ -43,15 +43,19 @@ def bag_to_vector(bag):
 def list_to_bag(ls):
     bag = defaultdict(lambda: 0)
     for l in ls:
-        bag[l] += 1
+        # bag[l] += 1
+        bag[l] = 1
     return bag
 
 def random_hash(vector):
+    # print(vector.shape)
+    new_vector = vector.astype('int')
+    return ''.join([str(x) for x in new_vector[0]])
     global transformer
     if transformer is None:
-        random.seed(42)
-        transformer = np.random.randn(32*4, len(lut)) #random_projection.SparseRandomProjection(32)
-        np.save("transformer.npy", transformer)
+        # random.seed(42)
+        # transformer = np.random.randn(32, len(lut)) #random_projection.SparseRandomProjection(32)
+        # np.save("transformer.npy", transformer)
         with open("transformer.npy", 'rb') as f:
             transformer = np.load(f)
     # new_vector = transformer.fit_transform(vector)
@@ -85,7 +89,7 @@ def pca(data):
     proj = (evec.T[:][:32])
     return proj
 
-def hash_distance(folder, n=200):
+def hash_distance(folder, n=100):
     global transformer
     files = [os.path.join(folder, x) for x in os.listdir(folder)]
     before = []
@@ -126,8 +130,8 @@ def hash_distance(folder, n=200):
     # normed_after = normalise(np.asarray(after))
     s = list(map(lambda x: cosine_sim(x[0], x[1]), product(normed_test, normed_test)))
     a = list(map(lambda x:
-                 [hamming(x[0][(y-1)*32:y*32], x[1][(y-1)*32:y*32]) for y in range(1,5)],
-#                 hamming(x[0], x[1]),
+                 # [hamming(x[0][(y-1)*32:y*32], x[1][(y-1)*32:y*32]) for y in range(1,5)],
+                 hamming(x[0], x[1]),
                  product(after, after)))
     # a = list(map(lambda x: cosine_sim(x[0], x[1]), product(normed_after, normed_after)))
     # for i, j in product(range(len(before)), range(len(before))):
@@ -138,15 +142,18 @@ def hash_distance(folder, n=200):
     a = np.asarray(a)
     print(a.shape)
     same_label = 0
-    high_score = 0
+    high_score_09 = 0
+    high_score_095 = 0
     same_high = 0
 
     for bh, ah in zip(s, a):
+        if bh >= 0.9:
+            high_score_09 += 1
         if bh >= 0.95:
-            high_score += 1
+            high_score_095 += 1
         if any([ahx == 0 for ahx in ah]):
             same_label += 1
-        if bh >= 0.95 and any([ahx == 0 for ahx in ah]):
+        if bh >= 0.9 and any([ahx == 0 for ahx in ah]):
             same_high += 1
         # if bh >= 0.9 and any([ahx == 0 for ahx in ah]):
         #     same_high += 1
@@ -159,9 +166,10 @@ def hash_distance(folder, n=200):
     print(len(s))
     print(same_high)
     print(same_label)
-    print(high_score)
+    print(high_score_095)
+    print(high_score_09)
     precision = same_high * 1.0 / same_label
-    recall = same_high * 1.0 / high_score
+    recall = same_high * 1.0 / high_score_09
     print(precision)
     print(recall)
 
@@ -171,7 +179,7 @@ def add_bag(graph, node):
         s += graph.nodes[n]['data']
     return s
 
-def calculate_wl(path, k=3):
+def calculate_wl(path, k=4):
     graph = nx.read_gpickle(path)
     if len(graph) == 0:
         return {}
@@ -185,6 +193,7 @@ def calculate_wl(path, k=3):
             else:
                 data = bag_to_vector(list_to_bag(node[1]))
             h = random_hash(data)
+            # print(h)
             if h in wl.keys():
                 wl[h] += 1
             else:
@@ -220,23 +229,23 @@ def build_database(path, n=1000):
     return database, saved_w
 
 def main():
-    hash_distance(sys.argv[1])
-    # db_name = "wl_db.pkl"
-    # if not os.path.isfile(db_name):
-    #     db, w = build_database(sys.argv[1])
-    #     with open("wl_db.pkl", 'wb') as handle:
-    #         pkl.dump(db, handle)
-    #     print(w)
-    # else:
-    #     handle = open(db_name, 'rb')
-    #     db = pkl.load(handle)
-    #     w = calculate_wl(sys.argv[1])
-    #     print(w)
-    # distance_list = {}
-    # for k, v in db.items():
-    #     distance_list[k] = label_distance(v, w)
-    # closest = sorted(distance_list.items(), key=lambda x: x[1], reverse=True)
-    # print(closest[:10])
+    # hash_distance(sys.argv[1])
+    db_name = "wl_db.pkl"
+    if not os.path.isfile(db_name):
+        db, w = build_database(sys.argv[1])
+        with open("wl_db.pkl", 'wb') as handle:
+            pkl.dump(db, handle)
+        print(w)
+    else:
+        handle = open(db_name, 'rb')
+        db = pkl.load(handle)
+        w = calculate_wl(sys.argv[1])
+        print(w)
+    distance_list = {}
+    for k, v in db.items():
+        distance_list[k] = label_distance(v, w)
+    closest = sorted(distance_list.items(), key=lambda x: x[1], reverse=True)
+    print(closest[:10])
 
 if __name__=='__main__':
     main()

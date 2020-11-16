@@ -161,7 +161,8 @@ class InstructionSimplifier(object):
             regs = r"-?r[0-9]+!?"
             reg_pointer = r"(pc|sp|lr)!?"
             instr = re.sub(regs, "REG", instr)
-            instr = re.sub(reg_pointer, "REGPTR", instr)
+            # instr = re.sub(reg_pointer, "REGPTR", instr)
+            instr = re.sub(reg_pointer, "REG", instr)
             return instr
         def variable(self, instr):
             instr = re.sub(r"\.LCPI[^\s]+", "VAR", instr)
@@ -181,7 +182,7 @@ class InstructionSimplifier(object):
                     if not matched:
                         il[idx] = "VAR"
                         self.opcode.add(part)
-            return " ".join(il)
+            return " ".join(il[:3])
         def simplify(self, instr):
             instr = self.remove_extra(instr)
             instr = self.immediate(instr)

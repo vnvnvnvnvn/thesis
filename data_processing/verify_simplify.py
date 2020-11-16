@@ -6,6 +6,7 @@ from collections import defaultdict
 
 keys = set(["VAR", "IMM", "ADDR", "FUNC", "BB", "REG", "REGPTR"])
 vocab = defaultdict(lambda:0)
+
 def main():
     unrecognized = set()
     with open(sys.argv[1]) as f:
@@ -23,5 +24,6 @@ def main():
     words = sorted(vocab.keys())
     with open("word_file_arm", 'w') as wf:
         wf.write("\n".join(words))
+
 if __name__=='__main__':
     main()

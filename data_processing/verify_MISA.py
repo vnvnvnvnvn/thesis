@@ -62,7 +62,7 @@ def generate_data(folder):
 
 def generate_simplified_graph(simp, folder):
     arch = folder.split("/")[-1]
-    saved_dirname = os.path.join(os.getcwd(), "simp_graphs", arch)
+    saved_dirname = os.path.join(os.getcwd(), "simp_graphs_2", arch)
     for f in os.listdir(folder):
         full_path = os.path.join(folder, f)
         orig_g = nx.read_gpickle(full_path)
@@ -78,7 +78,8 @@ def generate_simplified_graph(simp, folder):
 def main():
     simp = proc.InstructionSimplifier()
     if os.path.isdir(sys.argv[1]):
-        generate_simplified_graph(simp, os.path.join(sys.argv[1], "arm"))
+        generate_vocab(simp, os.path.join(sys.argv[1], "arm"))
+        # generate_simplified_graph(simp, os.path.join(sys.argv[1], "arm"))
         pass
         # generate_vocab(simp, os.path.join(sys.argv[1], "arm"))
         # generate_vocab(simp, os.path.join(sys.argv[1], "x86"))
