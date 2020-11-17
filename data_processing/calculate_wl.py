@@ -43,14 +43,14 @@ def bag_to_vector(bag):
 def list_to_bag(ls):
     bag = defaultdict(lambda: 0)
     for l in ls:
-        # bag[l] += 1
-        bag[l] = 1
+        bag[l] += 1
+        # bag[l] = 1
     return bag
 
 def random_hash(vector):
     # print(vector.shape)
-    new_vector = vector.astype('int')
-    return ''.join([str(x) for x in new_vector[0]])
+    # new_vector = vector.astype('int')
+    # return ''.join([str(x) for x in new_vector[0]])
     global transformer
     if transformer is None:
         # random.seed(42)
@@ -213,7 +213,7 @@ def label_distance(w1, w2):
         dot += w1[s] * w2[s]
     return dot / scale
 
-def build_database(path, n=60000):
+def build_database(path, n=6000):
     database = {}
     files = os.listdir(path)
     files.sort()
