@@ -219,13 +219,15 @@ def build_database(path, n=60000):
     files.sort()
     saved_w = {}
     for i in range(n):
-        print(files[i])
+        # print(files[i])
         w = calculate_wl(os.path.join(path, files[i]))
         if files[i] == "arlex_yylex_destroy_0":
             saved_w = w
         if len(w) == 0:
             continue
         database[files[i]] = w
+        if i % 500 == 0:
+            print("Finished with file " + str(i))
     return database, saved_w
 
 def main():
