@@ -8,7 +8,13 @@ def top_distance(db, item, topk=10):
     for k, v in db.items():
         distance_list[k] = label_distance(v, item)
     closest = sorted(distance_list.items(), key=lambda x: x[1], reverse=True)
-    return closest[:topk]
+    start_idx = 0
+    for i in range(len(closest)):
+        if closest[i] < 1.0:
+            start_idx = i - 1
+    if start_idx < 0:
+        start_idx = 0
+    return closest[:start_idx+topk]
 
 def isin(top, name):
     for idx, elem in enumerate(top):
@@ -25,7 +31,7 @@ def main():
     db = pkl.load(handle)
     cnt = 0
     item_list = db.items()
-    random.shuffle(item_list)
+    # random.shuffle(item_list)
     for k, v in item_list[:100]:
         closest = top_distance(db, v)
         correct = isin(closest, k)
