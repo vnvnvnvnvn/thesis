@@ -13,6 +13,7 @@ class InstructionSimplifier(object):
         sim_block = [self.simplifiers[arch].simplify(instruction)
                      for instruction in block]
         return sim_block
+
     def conclude(self):
         print(self.simplifiers['x86'].notrecognized)
         print(self.simplifiers['x86'].opcode)
@@ -21,6 +22,7 @@ class InstructionSimplifier(object):
         print(self.simplifiers['arm'].opcode)
         print(self.simplifiers['arm'].opcode_matched)
         print(self.simplifiers['arm'].code_counter)
+
     class X86(object):
         def __init__(self):
             self.notrecognized = set()
@@ -42,19 +44,25 @@ class InstructionSimplifier(object):
                 r"(callq|int|into|iret|nop|ret|retn|retf|wait|xchg|xlat|hlt|lock)$": "PROC",
                 r"(in|lahf|lds|lea|les|lodsb|lodsw|out|pop|popf|push|pushf|sahf|stosb|stosw)" + suffix + r"$": "TRANSFER"
             }
+
         def remove_extra(self, instr):
             instr = re.sub(r"#.+", "", instr)
             instr = instr.replace(",", " ")
             return instr
+
         def immediate(self, instr):
             return re.sub(r"\$[\-]?[0-9]+", 'IMM', instr)
+
         def address(self, instr):
             return re.sub(r"[^\(\s]*\(.+\)", "ADDR", instr)
+
         def function(self, instr):
             instr = re.sub(r"callq\s.+", "callq FUNC", instr)
             return re.sub(r"^jmp[\s]+[\w]+", "jmp FUNC", instr)
+
         def bb_label(self, instr):
             return re.sub(r"\s\..+$", " BB", instr)
+
         def reg_class(self, instr):
             regs = [r"%[re]?[abcd]x\b",
                     r"%[abcd][lh]\b",
@@ -66,6 +74,7 @@ class InstructionSimplifier(object):
             for r in regs:
                 instr = re.sub(r, "REG", instr)
             return re.sub(reg_pointer, "REGPTR", instr)
+
         def variable(self, instr):
             instr = re.sub(r"\$[\.a-zA-Z][^\s]+", "VAR", instr)
             il = instr.split()
@@ -77,6 +86,7 @@ class InstructionSimplifier(object):
                     self.notrecognized.add(il[idx])
                     il[idx] = "VAR"
             return " ".join(il)
+
         def classify(self, instr):
             il = instr.split()
             for idx, part in enumerate(il):
@@ -92,6 +102,7 @@ class InstructionSimplifier(object):
                         il[idx] = "VAR"
                         self.opcode.add(part)
             return " ".join(il)
+
         def simplify(self, instr):
             instr = self.remove_extra(instr)
             instr = self.immediate(instr)
@@ -142,32 +153,40 @@ class InstructionSimplifier(object):
                 r"(swi|bkpt|setend|sev|smc|svc|tbb|tbh|wfe|wfi|yield)" + self.flags + r"$": "PROC",
                 r"(cdp|ldc|stc|mcr|mrc|cdp2|ldc2|mcr2|mcrr|mcrr2|mrc2|mrrc|stc2|sys)" + self.flags + r"[l]?$": "COPROC"
             }
+
         def remove_extra(self, instr):
             instr = re.sub(r"@.+", "", instr)
             instr = re.sub(',', " ", instr)
             instr = re.sub('{', " ", instr)
             instr = re.sub('}', " ", instr)
             return instr
+
         def immediate(self, instr):
             return re.sub(r"#[\-]?[0-9]+\b", "IMM", instr)
+
         def address(self, instr):
             return re.sub(r"\[.+\][!]?", "ADDR", instr)
+
         def function(self, instr):
             instr = re.sub(r"bl\s.+", "bl FUNC", instr)
             return re.sub(r"^b[\s]+[\w]+", "b FUNC", instr)
+
         def bb_label(self, instr):
             return re.sub(r"\.LBB[^\s]+", "BB", instr)
+
         def reg_class(self, instr):
             regs = r"-?r[0-9]+!?"
             reg_pointer = r"(pc|sp|lr)!?"
             instr = re.sub(regs, "REG", instr)
-            # instr = re.sub(reg_pointer, "REGPTR", instr)
+            instr = re.sub(reg_pointer, "REGPTR", instr)
             instr = re.sub(reg_pointer, "REG", instr)
             return instr
+
         def variable(self, instr):
             instr = re.sub(r"\.LCPI[^\s]+", "VAR", instr)
             instr = re.sub(r"\.LJTI[^\s]+", "VAR", instr)
             return re.sub(r"-?\d+\b", "VAR", instr)
+
         def classify(self, instr):
             il = instr.split()
             for idx, part in enumerate(il):
@@ -183,6 +202,7 @@ class InstructionSimplifier(object):
                         il[idx] = "VAR"
                         self.opcode.add(part)
             return " ".join(il[:3])
+
         def simplify(self, instr):
             instr = self.remove_extra(instr)
             instr = self.immediate(instr)

@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import random
 import numpy as np
 
 def name_to_index(data):
@@ -13,6 +12,6 @@ def name_to_index(data):
 wf = open("word_file_arm")
 lut = name_to_index(wf.readlines())
 
-random.seed(42)
-transformer = np.random.randn(32, len(lut))
+np.random.seed(42)
+transformer = np.random.randn(16, len(lut), 4)
 np.save("transformer.npy", transformer)
