@@ -40,16 +40,16 @@ def simplify_collect(g, arch, simp):
         #    print(d)
     return instr
 
-def generate_vocab(simp, folder):#, n=200):
+def generate_vocab(folder):#, n=200):
     collected = []
     arch = folder.split("/")[-1]
     files = [os.path.join(folder, x) for x in os.listdir(folder)]
     random.shuffle(files)
     dirpath = os.path.join(os.getcwd(), "vocab", arch)
     for i in range(len(files)):
-        fns = rmisa.read_file(files[i], arch)
-        for name, data in fns.items():
-            collected += simplify_collect(data, arch, simp)
+        g = nx.read_gpickle(files[i])
+        for node in g.nodes(data=True):
+            collected += node[1]['data']
     with open(os.path.join(dirpath, "saved"), 'w') as f:
         f.write("\n".join(collected))
 
@@ -62,8 +62,12 @@ def generate_data(folder):
 
 def generate_simplified_graph(simp, folder):
     arch = folder.split("/")[-1]
-    saved_dirname = os.path.join(os.getcwd(), "simp_graphs_2", arch)
+    saved_dirname = os.path.join(os.getcwd(), "simp_graphs", arch)
+    cnt = 0
     for f in os.listdir(folder):
+        cnt += 1
+        if cnt % 100 == 0:
+            print("Done with "+ str(cnt))
         full_path = os.path.join(folder, f)
         orig_g = nx.read_gpickle(full_path)
         for d in orig_g.nodes(data=True):
@@ -78,17 +82,23 @@ def generate_simplified_graph(simp, folder):
 def main():
     simp = proc.InstructionSimplifier()
     if os.path.isdir(sys.argv[1]):
-        generate_vocab(simp, os.path.join(sys.argv[1], "arm"))
-        # generate_simplified_graph(simp, os.path.join(sys.argv[1], "arm"))
-        pass
         # generate_vocab(simp, os.path.join(sys.argv[1], "arm"))
-        # generate_vocab(simp, os.path.join(sys.argv[1], "x86"))
+        # pass
+        # generate_vocab(simp, os.path.join(sys.argv[1], "arm"))
+        # generate_data(os.path.join(sys.argv[1], "x86"))
+        # generate_simplified_graph(simp, os.path.join(sys.argv[1], "x86"))
+        generate_vocab(sys.argv[1])
     else:
         fns = rmisa.read_file(sys.argv[1], "x86")
         for name, data in fns.items():
             #print(simplify_collect(data, "x86", simp))
             nx.draw_networkx(data)
             plt.show()
+            for node in data.nodes(data='data'):
+                print(node[1])
+                sb = simp.simplify(node[1], 'x86')
+                print(sb)
+                print("\n\n")
     simp.conclude()
     # g = nx.read_gpickle(sys.argv[1])
     # for d in g.nodes(data=True):

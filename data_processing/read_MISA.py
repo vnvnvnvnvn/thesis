@@ -33,12 +33,13 @@ def process(lines, func, arch):
             last_label = label
             cur_blocks = []
         else:
+            if l[0] != "\t" and l[0] != " ":
+                continue
             l = l.split(jump_arch[arch][3])[0].strip()
             if len(l) == 0 or l[0] == '.':
                 continue
             l = l.replace("\t", " ")
             cur_blocks.append(l)
-
     branch_points = [x for x in ids.items() if x[0] in blocks.keys()]
     branch_points = sorted(branch_points, key=lambda x: x[1])
     # print(blocks)
@@ -169,13 +170,18 @@ def read_file(path, arch):
     return functions
 
 if __name__=='__main__':
-    # read_file(sys.argv[1], "arm")
-    cnt = 0
-    for name in os.listdir(sys.argv[1]):
-        fns = read_file(os.path.join(sys.argv[1], name), "arm")
-        save_file(os.path.join(sys.argv[1], name), "arm", fns)
-        cnt += 1
-        if cnt >= 200:
-            break
-    print(jump_instr)
+    fs = read_file(sys.argv[1], "x86")
+    for name, fn in fs.items():
+        print(name)
+        for node in fn.nodes(data='data'):
+            print(node[0])
+            print(node[1])
+    # cnt = 0
+    # for name in os.listdir(sys.argv[1]):
+    #     fns = read_file(os.path.join(sys.argv[1], name), "arm")
+    #     save_file(os.path.join(sys.argv[1], name), "arm", fns)
+    #     cnt += 1
+    #     if cnt >= 200:
+    #         break
+    # print(jump_instr)
     # print(unreachable)

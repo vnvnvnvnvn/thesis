@@ -9,8 +9,8 @@ class InstructionSimplifier(object):
         self.simplifiers['x86'] = self.X86()
         self.simplifiers['arm'] = self.Arm()
 
-    def simplify(self, block, arch):
-        sim_block = [self.simplifiers[arch].simplify(instruction)
+    def simplify(self, block, arch, jmp_pts=set()):
+        sim_block = [self.simplifiers[arch].simplify(instruction, jmp_pts)
                      for instruction in block]
         return sim_block
 
@@ -72,75 +72,87 @@ class InstructionSimplifier(object):
                 r"(wbinvd|wr|rd)": "TRANSFER",
                 r"(blsmsk|blsr|bzhi|clac)": "LOGICAL"
             }
+            self.word_size = set(["word", "dword", "byte", "qword", "ptr"])
 
         def remove_extra(self, instr):
             instr = re.sub(r"#.+", "", instr)
             instr = instr.replace(",", " ")
+            instr = instr.replace(":", " ")
+            instr = instr.replace("!", " ")
+            instr = instr.split()
+            for i in range(len(instr)):
+                if instr[i] in self.word_size:
+                    instr[i] = ""
+            instr = " ".join(instr)
             return instr
 
         def immediate(self, instr):
-            return re.sub(r"\$[\-]?[0-9]+", 'IMM', instr)
+            instr = re.sub(r"\b[\-]?[0-9]+\b", 'IMM', instr)
+            instr = re.sub(r"\b0x[\-]?[0-9abcdef]+\b", 'IMM', instr)
+            return instr
 
         def address(self, instr):
-            return re.sub(r"[^\(\s]*\(.+\)", "ADDR", instr)
+            return re.sub(r"[^[\s]*\[.+\]", "ADDR", instr)
 
-        def function(self, instr):
-            instr = re.sub(r"callq\s.+", "callq FUNC", instr)
-            return re.sub(r"^jmp[\s]+[\w]+", "jmp FUNC", instr)
-
-        def bb_label(self, instr):
-            return re.sub(r"\s\..+$", " BB", instr)
+        def bb_label(self, instr, remaining, jmp_pts):
+            if not re.match(r"(call|j)", instr):
+                return remaining
+            instr_split = remaining.split()
+            for i in range(len(instr_split)):
+                if instr_split[i] in jmp_pts:
+                    instr_split[i] = "BB"
+                else:
+                    instr_split[i] = "FUNC"
+            instr = " ".join(instr_split)
+            return instr
 
         def reg_class(self, instr):
-            regs = [r"%[re]?[abcd]x\b",
-                    r"%[abcd][lh]\b",
-                    r"%[re]?[sd]i\b",
-                    r"%[sd]il\b",
-                    r"%[x]?mm[0-9]+\b",
-                    r"%r[0-9]+[dwb]?\b"]
-            reg_pointer = r"%(rbp|rsp|ebp|esp|bp|sp)[lh]?\b"
+            regs = [r"[re]?[abcd]x\b",
+                    r"[abcd][lh]\b",
+                    r"[re]?[sd]i\b",
+                    r"[sd]il\b",
+                    r"[x]?mm[0-9]+\b",
+                    r"r[0-9]+[dwb]?\b"]
+            reg_pointer = r"(rbp|rsp|ebp|esp|bp|sp)[lh]?\b"
             for r in regs:
                 instr = re.sub(r, "REG", instr)
             return re.sub(reg_pointer, "REGPTR", instr)
 
         def variable(self, instr):
-            instr = re.sub(r"\$[\.a-zA-Z][^\s]+", "VAR", instr)
             il = instr.split()
             for idx, part in enumerate(il):
-                if idx == 0:
-                    # self.opcode.add(part)
-                    continue
-                if part not in ["VAR", "IMM", "ADDR", "FUNC", "BB", "REG", "REGPTR"]:
+                if part not in set(["VAR", "IMM", "ADDR", "FUNC", "BB", "REG", "REGPTR"]):
                     self.notrecognized.add(il[idx])
                     il[idx] = "VAR"
             return " ".join(il)
 
         def classify(self, instr):
-            il = instr.split()
-            idx = 0
-            part = il[idx]
             matched = False
             for template, t in self.opcode_classify.items():
-                if re.match(template, part):
+                if re.match(template, instr):
                     matched = True
-                    il[idx] = t
                     self.code_counter[t] += 1
-                    self.opcode_matched.add(part)
-                    break
+                    self.opcode_matched.add(instr)
+                    return t
             if not matched:
                 self.opcode.add(part)
-            return " ".join(il)
-
-        def simplify(self, instr):
-            instr = self.remove_extra(instr)
-            instr = self.immediate(instr)
-            instr = self.address(instr)
-            instr = self.function(instr)
-            instr = self.bb_label(instr)
-            instr = self.reg_class(instr)
-            instr = self.variable(instr)
-            instr = self.classify(instr)
             return instr
+
+        def simplify(self, instr, jmp_pts=set()):
+            s = instr.split(" ", 1)
+            if len(s) > 1:
+                instr, remaining_part = s
+                remaining_part = self.remove_extra(remaining_part)
+                remaining_part = self.address(remaining_part)
+                remaining_part = self.bb_label(instr, remaining_part, jmp_pts)
+                remaining_part = self.immediate(remaining_part)
+                remaining_part = self.reg_class(remaining_part)
+                remaining_part = self.variable(remaining_part)
+            else:
+                instr = s[0]
+                remaining_part = ""
+            instr = self.classify(instr)
+            return " ".join([instr, remaining_part])
 
     class Arm(object):
         def __init__(self):

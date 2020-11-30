@@ -7,9 +7,11 @@ from distance import hamming
 import os
 from collections import defaultdict
 import copy
+import pickle as pkl
+import time
 
 transformer_file = "transformer.npy"
-word_file = "word_file_arm"
+word_file = "vs_word_file"
 lut = None
 transformer = None
 
@@ -50,22 +52,29 @@ def random_hash(vector):
     return h
 
 
-def hash_distance(folder, max_blk_cnt, n=100, sensitivity=0.9):
-    files = [os.path.join(folder, x) for x in os.listdir(folder)]
-    test = []
+def hash_distance(sim_file, sensitivity=0.9):
+    # files = [os.path.join(folder, x) for x in os.listdir(folder)]
+    # test = []
+    # after = []
+    # current_blk_cnt = 0
+    # for i in range(n):
+    #     if current_blk_cnt >= max_blk_cnt:
+    #         break
+    #     graph = nx.read_gpickle(files[i])
+    #     for node in graph.nodes(data=True):
+    #         if len(node[1]['data']) == 0:
+    #             continue
+    #         d = bag_to_vector(list_to_bag(node[1]['data']))
+    #         test.append(copy.deepcopy(d[0]))
+    #         current_blk_cnt += 1
+    # print(current_blk_cnt)
     after = []
-    current_blk_cnt = 0
-    for i in range(n):
-        if current_blk_cnt >= max_blk_cnt:
-            break
-        graph = nx.read_gpickle(files[i])
-        for node in graph.nodes(data=True):
-            if len(node[1]['data']) == 0:
-                continue
-            d = bag_to_vector(list_to_bag(node[1]['data']))
-            test.append(copy.deepcopy(d[0]))
-            current_blk_cnt += 1
-    print(current_blk_cnt)
+    with open(sim_file, 'rb') as f:
+        vectorized_blks = pkl.load(f)
+
+    vectorized_blks = np.squeeze(vectorized_blks)
+    print(vectorized_blks.shape)
+
     def normalise(A):
         lengths = ((A**2).sum(axis=1, keepdims=True)**.5)
         return A/lengths
@@ -73,25 +82,48 @@ def hash_distance(folder, max_blk_cnt, n=100, sensitivity=0.9):
         return np.dot(p, q)
 
     def hashing_sim(p, q):
-        d = []
+        cnt = max(len(q) / 2, 1)
         for a, b in zip(p, q):
-            d.append(hamming(a, b))
-        d.sort()
-        return sum(d[:2]) / 2
+            if a == b:
+                cnt -= 1
+            # d.append(hamming(a, b))
+        # d.sort()
+        if cnt < 0:
+            cnt = 0
+        return cnt #sum(d[:2]) / 2
 
-    normed_test = normalise(np.asarray(test))
+    hash_convert_time = 0
+    normed_test = normalise(np.asarray(vectorized_blks))
     for b in normed_test:
-        h = random_hash(b.T)
+        start = time.clock()
+        h = random_hash(b)
+        end = time.clock()
+        hash_convert_time += (end - start)
         after.append(copy.deepcopy(h))
 
+    average_conversion_time = hash_convert_time / len(normed_test)
+    print(average_conversion_time)
+    print(len(normed_test))
+    print(len(after[0]))
+    print(len(after[0][0]))
     high_score = 0
     same_label = 0
     same_high = 0
-    print(len(normed_test))
+
+    cosine_time = 0
+    hash_time = 0
+    total_pairs = 0
+
     for i in range(len(normed_test)):
         for j in range(i + 1, len(normed_test)):
+            start_cosine = time.clock()
             orig_dist = cosine_sim(normed_test[i], normed_test[j])
+            end_cosine = time.clock()
             hash_dist = hashing_sim(after[i], after[j])
+            end_hash = time.clock()
+            cosine_time += (end_cosine - start_cosine)
+            hash_time += (end_hash - end_cosine)
+            total_pairs += 1
             if orig_dist >= sensitivity:
                 high_score += 1
             if hash_dist == 0:
@@ -101,12 +133,17 @@ def hash_distance(folder, max_blk_cnt, n=100, sensitivity=0.9):
 
     precision = same_high * 1.0 / same_label
     recall = same_high * 1.0 / high_score
+    f1 = 2 * precision * recall / (precision + recall)
     print(high_score)
-    print(precision)
-    print(recall)
+    print("(" + str(precision)+", "+str(recall)+")")
+    # print(recall)
+    print(f1)
+    print(total_pairs)
+    print("Average time for cosine "+ str(cosine_time / total_pairs))
+    print("Average time for hash "+ str(hash_time / total_pairs))
 
 def main():
-    hash_distance(sys.argv[1], int(sys.argv[2]))
+    hash_distance(sys.argv[1], 0.95)
 
 if __name__=='__main__':
     main()
