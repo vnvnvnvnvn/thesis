@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import re
 from collections import defaultdict
@@ -72,7 +72,7 @@ class InstructionSimplifier(object):
                 r"(wbinvd|wr|rd)": "TRANSFER",
                 r"(blsmsk|blsr|bzhi|clac)": "LOGICAL"
             }
-            self.word_size = set(["word", "dword", "byte", "qword", "ptr"])
+            self.word_size = set(["word", "dword", "byte", "qword", "xmmword", "ptr"])
 
         def remove_extra(self, instr):
             instr = re.sub(r"#.+", "", instr)

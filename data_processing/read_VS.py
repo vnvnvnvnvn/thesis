@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import json
 import networkx as nx
@@ -52,7 +52,6 @@ def json_to_graph(name):
         saved_data[off] = item
         g.add_node(str(off), data=current_bag)
         if 'jump' in item.keys():
-            # g.add_edge(str(off), str(item['jump']))
             edge_list.add((str(off), str(item['jump'])))
 
     jmp_pts_dec.sort()
@@ -73,29 +72,20 @@ def json_to_graph(name):
             if idx < len(jmp_pts_dec) - 1:
                 next_idx = jmp_pts_dec[idx+1]
                 edge_list.add((str(jp), str(next_idx)))
-    # print(edge_list)
     g.add_edges_from(edge_list)
-    # for node in g.nodes(data='data'):
-        # if len(g[node[0]]) == 0:
-            # print(node[0])
-        # if node[1] is None or len(node[1]) == 0:
-            # print(saved_data[node[0]])
-            # print(node[1])
-    # print(func_addr)
     return g, jmp_pts
 
 def simplify_graph(saved_dir, name):
     g = nx.read_gpickle(name)
     for d in g.nodes(data=True):
         if 'data' not in d[1].keys():
-            print("No data " + d[0])
             d[1]['data'] = []
-            print(d[1]['data'])
             continue
         sim_block = simp.simplify(d[1]['data'], "x86")
         d[1]['data'] = sim_block
         saved_path = os.path.join(saved_dir, name)
         nx.write_gpickle(g, saved_path)
+    return saved_path
 
 def generate_graph(json_folder, saved_dir, data):
     d, arch = data
@@ -106,29 +96,84 @@ def generate_graph(json_folder, saved_dir, data):
         g, jmp_pts = json_to_graph(os.path.join(json_folder, d))
         if len(g.nodes()) == 0:
             return
-        # saved_path = os.path.join(saved_dir, d)
-        # nx.write_gpickle(g, saved_path)
+        saved_path = os.path.join(saved_dir, d)
+        nx.write_gpickle(g, saved_path)
         saved_subdir = os.path.join(os.getcwd(), "simp_vsgraphs", t)
         for d in g.nodes(data=True):
             if 'data' not in d[1].keys():
-                print("No data " + d[0])
                 d[1]['data'] = []
-                print(d[1]['data'])
                 continue
             sim_block = simp.simplify(d[1]['data'], "x86", jmp_pts)
             d[1]['data'] = sim_block
         simp_saved_path = os.path.join(saved_subdir, name)
         nx.write_gpickle(g, simp_saved_path)
+    return simp_saved_path
 
-def main():
+def generate_graph_nonrec(saved_dir, file_name):
+    name = os.path.basename(file_name)
+    g, jmp_pts = json_to_graph(file_name)
+    if len(g.nodes()) == 0:
+        return
+    saved_path = os.path.join(saved_dir, name)
+    nx.write_gpickle(g, saved_path)
+    saved_subdir = os.path.join(os.getcwd(), "simp_vsgraphs", "Benign")
+    for d in g.nodes(data=True):
+        if 'data' not in d[1].keys():
+            d[1]['data'] = []
+            continue
+        sim_block = simp.simplify(d[1]['data'], "x86", jmp_pts)
+        d[1]['data'] = sim_block
+    simp_saved_path = os.path.join(saved_subdir, name)
+    nx.write_gpickle(g, simp_saved_path)
+    return simp_saved_path
+
+def process_all_virus_data(json_folder):
     handle = open('reporting_type.pkl', 'rb')
     data_arch = pickle.load(handle)
     handle.close()
     print(len(data_arch))
-    saved_dir = os.path.join(os.getcwd(), "vsgraphs", "x86")
-    json_folder = sys.argv[1]
+    virus_saved_dir = os.path.join(os.getcwd(), "vsgraphs", "x86")
+    todo = [os.path.join(json_folder, x) for x in os.listdir(json_folder)]
     with ProcessPoolExecutor(10) as ex:
-        ex.map(partial(generate_graph, json_folder, saved_dir), data_arch.items())
+        ex.map(partial(generate_graph, json_folder, virus_saved_dir), data_arch.items())
+
+def process_benign_data(json_folder):
+    benign_saved_dir = os.path.join(os.getcwd(), "benign_graphs", "x86")
+    todo = [os.path.join(json_folder, x) for x in os.listdir(json_folder)]
+    with ProcessPoolExecutor(10) as ex:
+        ex.map(partial(generate_graph_nonrec, saved_dir), todo)
+
+def generate_vocab(folder):
+    vocab = defaultdict(lambda:0)
+    unrecognized = set()
+    files = []
+    for subdir in os.listdir(folder):
+        subdir_path = os.path.join(folder, subdir)
+        files += [os.path.join(subdir_path, x) for x in os.listdir(subdir_path)]
+    vocab_path = "vs_word_file"
+    for i in range(len(files)):
+        g = nx.read_gpickle(files[i])
+        for node in g.nodes(data='data'):
+            for opcode in node[1]:
+                vocab[opcode] += 1
+    vocab_saved = {}
+    for item, value in vocab.items():
+        vocab_saved[item] = value
+    words = sorted(vocab.keys())
+    with open(vocab_path, 'w') as wf:
+        wf.write("\n".join(words))
+    freq_saved = vocab_path + "_freq.pkl"
+    with open(freq_saved, "wb") as handle:
+        pickle.dump(vocab_saved, handle)
+    return vocab_path
+
+def main():
+    if len(sys.argv) < 3:
+        print("USAGE:\n\tread_VS.py <json_virus_folder> <json_benign_folder>")
+        exit()
+    process_benign_data(sys.argv[2])
+    process_all_virus_data(sys.argv[1])
+    generate_vocab(os.path.join(os.getcwd(), "simp_vsgraphs"))
 
 if __name__=='__main__':
     main()

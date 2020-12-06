@@ -1,13 +1,14 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import networkx as nx
 import sys
 import matplotlib.pyplot as plt
 import process_MISA as proc
 import os
-import random
 import shutil
 import read_MISA as rmisa
+import pickle
+from collections import defaultdict
 
 def draw(G):
     pos = nx.layout.spring_layout(G)
@@ -25,40 +26,38 @@ def draw(G):
         edge_cmap=plt.cm.Blues,
         width=2,
     )
-    #plt.show()
+    plt.show()
 
-def simplify_collect(g, arch, simp):
-    instr = []
-    for d in g.nodes(data=True):
-        if 'data' not in d[1].keys():
-            print("No data " + d[0])
-            continue
-        sim_block = simp.simplify(d[1]['data'], arch)
-        instr += sim_block
-        #except:
-        #    print("Failed")
-        #    print(d)
-    return instr
-
-def generate_vocab(folder):#, n=200):
-    collected = []
+def generate_vocab(folder):
+    vocab = defaultdict(lambda:0)
+    unrecognized = set()
     arch = folder.split("/")[-1]
     files = [os.path.join(folder, x) for x in os.listdir(folder)]
-    random.shuffle(files)
-    dirpath = os.path.join(os.getcwd(), "vocab", arch)
+    vocab_path = "_".join(["word_file", arch])
     for i in range(len(files)):
         g = nx.read_gpickle(files[i])
-        for node in g.nodes(data=True):
-            collected += node[1]['data']
-    with open(os.path.join(dirpath, "saved"), 'w') as f:
-        f.write("\n".join(collected))
+        for node in g.nodes(data='data'):
+            for opcode in node[1]:
+                vocab[opcode] += 1
+    vocab_saved = {}
+    for item, value in vocab.items():
+        vocab_saved[item] = value
+    words = sorted(vocab.keys())
+    with open(vocab_path, 'w') as wf:
+        wf.write("\n".join(words))
+    freq_saved = vocab_path + "_freq.pkl"
+    with open(freq_saved, "wb") as handle:
+        pickle.dump(vocab_saved, handle)
+    return vocab_path
 
 def generate_data(folder):
     arch = folder.split("/")[-1]
     files = [os.path.join(folder, x) for x in os.listdir(folder)]
+    saved_dirname = os.path.join(os.getcwd(), "graphs", arch)
     for i in range(len(files)):
         fns = rmisa.read_file(files[i], arch)
-        rmisa.save_file(files[i], arch, fns)
+        rmisa.save_file(files[i], arch, fns, saved_dirname)
+    return saved_dirname
 
 def generate_simplified_graph(simp, folder):
     arch = folder.split("/")[-1]
@@ -72,46 +71,39 @@ def generate_simplified_graph(simp, folder):
         orig_g = nx.read_gpickle(full_path)
         for d in orig_g.nodes(data=True):
             if 'data' not in d[1].keys():
-                print("No data " + d[0])
                 continue
             sim_block = simp.simplify(d[1]['data'], arch)
             d[1]['data'] = sim_block
         saved_path = os.path.join(saved_dirname, f)
         nx.write_gpickle(orig_g, saved_path)
+    return saved_dirname
+
+def generate_all_data(folder):
+    simp = proc.InstructionSimplifier()
+    saved_graphs_path = generate_data(folder)
+    saved_simplified = generate_simplified_graph(simp, saved_graphs_path)
+    generate_vocab(saved_simplified)
 
 def main():
-    simp = proc.InstructionSimplifier()
+    if len(sys.argv) < 2:
+        print("USAGE:\n\tverify_MISA.py <folder>\n\tverify_MISA.py <filename> <architecture>")
+        exit()
     if os.path.isdir(sys.argv[1]):
-        # generate_vocab(simp, os.path.join(sys.argv[1], "arm"))
-        # pass
-        # generate_vocab(simp, os.path.join(sys.argv[1], "arm"))
-        # generate_data(os.path.join(sys.argv[1], "x86"))
-        # generate_simplified_graph(simp, os.path.join(sys.argv[1], "x86"))
-        generate_vocab(sys.argv[1])
+        generate_all_data(sys.argv[1])
     else:
-        fns = rmisa.read_file(sys.argv[1], "x86")
+        simp = proc.InstructionSimplifier()
+        arch = "x86"
+        if len(sys.argv) >= 3:
+            arch = sys.argv[2]
+        fns = rmisa.read_file(sys.argv[1], arch)
         for name, data in fns.items():
-            #print(simplify_collect(data, "x86", simp))
-            nx.draw_networkx(data)
-            plt.show()
             for node in data.nodes(data='data'):
                 print(node[1])
-                sb = simp.simplify(node[1], 'x86')
+                sb = simp.simplify(node[1], arch)
                 print(sb)
                 print("\n\n")
-    simp.conclude()
-    # g = nx.read_gpickle(sys.argv[1])
-    # for d in g.nodes(data=True):
-    #     print("\n\n")
-    #     print(d)
-    #     print(g[d[0]])
-    #     sim_block = simp.simplify(d[1]['data'], 'arm')
-    #     print(sim_block)
-    # for e in g.edges(data=True):
-    #     print(e)
-    # # draw(g)
-    # nx.draw_networkx(g)
-    # plt.show()
+            nx.draw_networkx(data)
+            plt.show()
 
 if __name__=='__main__':
     main()

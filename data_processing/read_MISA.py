@@ -1,10 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import networkx as nx
 import re
 import sys
 import copy
 import os
+import matplotlib.pyplot as plt
 
 jump_instr = set()
 jump_arch = {"x86": ("j", "jmp", set(), "#"),
@@ -13,7 +14,6 @@ unreachable = set()
 func_names = set()
 
 def process(lines, func, arch):
-    # print("\n\n"+func)
     unresolved = []
     ids = {}
     edge_list = []
@@ -27,7 +27,6 @@ def process(lines, func, arch):
         if (l[:2] == ".L" and l[:5] != ".Ltmp") or ("%bb" in l[:5]):
             label = l.split(":")[0]
             ids[label] = i
-            # if len(cur_blocks) > 0:
             if i > 0:
                 blocks[last_label] = copy.deepcopy(cur_blocks)
             last_label = label
@@ -42,27 +41,6 @@ def process(lines, func, arch):
             cur_blocks.append(l)
     branch_points = [x for x in ids.items() if x[0] in blocks.keys()]
     branch_points = sorted(branch_points, key=lambda x: x[1])
-    # print(blocks)
-    # print(branch_points)
-    # cur_id = func + "_0"
-    # cur_branch = 1
-
-    # for i, l in enumerate(lines):
-    #     l = l.split(jump_arch[arch][3])[0].strip()
-    #     if len(l) == 0:
-    #         continue
-    #     if l[0] == ".":
-    #         continue
-
-    #     if i == branch_points[cur_branch][1]:
-    #         cur_branch += 1
-    #         if len(cur_blocks) > 0:
-    #             blocks[cur_id] = copy.deep_copy(cur_blocks)
-    #             cur_blocks = []
-    #         if cur_branch >= len(branch_points):
-    #             break
-
-    #     l = l.replace("\t", " ")
     for bpidx, bid in enumerate(branch_points):
         if bid[0] not in blocks.keys():
             continue
@@ -79,49 +57,23 @@ def process(lines, func, arch):
             instr = cmd[0]
             dest = cmd[1]
             if dest in ids:
-            #    dest = func + "_" + str(ids[dest])
-            #    edge_list.append((cur_id, dest))
                 edge_list.append((bid[0], dest))
                 jump_instr.add(instr)
-            #    cur_blocks.append(l)
-            #    print(cur_blocks)
-            #    g.add_node(cur_id, data=copy.deepcopy(cur_blocks))
-                # cur_blocks = []
-                # j = i+1
-                # while lines[j] == "":
-                #     j += 1
-                # if lines[j].strip()[0] != ".":
-                #     next_blk = func + "_" + str(j)
-                # else:
-                #     while lines[j].strip()[0] == "." and lines[j].split(":")[0] not in ids:
-                #         j += 1
-                #     if lines[j].split(":")[0] not in ids:
-                #         print(lines[j] + " not in ids")
-                #     next_blk = func + "_" + str(j)
                 if instr != jump_arch[arch][1] and bpidx < len(branch_points) - 1:
                     next_blk = branch_points[bpidx+1][0]
                     edge_list.append((bid[0], next_blk))
-                # cur_id = next_blk
             else:
                 if dest in func_names:
                     unresolved.append((bid[0], dest))
-#                print("In " + func + " Dest not in id " + l)
                 unreachable.add(dest)
-                # cur_blocks.append(l)
         else:
-            # cur_blocks.append(l)
             if bpidx < len(branch_points) - 1:
                 next_blk = branch_points[bpidx+1][0]
                 edge_list.append((bid[0], next_blk))
-    # g.add_node(cur_id, data=copy.deepcopy(cur_blocks))
-    # print(edge_list)
-    # for p in edge_list:
-    #     g.add_edge(*p)
     g.add_edges_from(edge_list)
-    # print(len(g.edges))
     return g
 
-def save_file(path, arch, functions):
+def save_file(path, arch, functions, saved_dirname):
     file_name = os.path.basename(path)
     file_name = re.sub(".c.s$", "", file_name)
     file_name = file_name.split("-")
@@ -135,7 +87,6 @@ def save_file(path, arch, functions):
             level_idx = idx
             break
     file_name = "_".join(file_name[level_idx+1:])
-    saved_dirname = os.path.join(os.getcwd(), "graphs", arch)
     if not os.path.exists(saved_dirname):
         os.mkdir(saved_dirname)
 
@@ -143,6 +94,7 @@ def save_file(path, arch, functions):
         saved_path = os.path.join(saved_dirname,
                                   "_".join([file_name, name, level]))
         nx.write_gpickle(data, saved_path)
+    return file_name
 
 def read_file(path, arch):
     print("Processing " + path)
@@ -169,19 +121,18 @@ def read_file(path, arch):
                 functions[name] = process(lines[ids[label] : ids[end]+1], name, arch)
     return functions
 
-if __name__=='__main__':
-    fs = read_file(sys.argv[1], "x86")
+def inspect(name, arch):
+    fs = read_file(name, arch)
     for name, fn in fs.items():
         print(name)
         for node in fn.nodes(data='data'):
             print(node[0])
             print(node[1])
-    # cnt = 0
-    # for name in os.listdir(sys.argv[1]):
-    #     fns = read_file(os.path.join(sys.argv[1], name), "arm")
-    #     save_file(os.path.join(sys.argv[1], name), "arm", fns)
-    #     cnt += 1
-    #     if cnt >= 200:
-    #         break
-    # print(jump_instr)
-    # print(unreachable)
+        nx.draw_networkx(fn)
+        plt.show()
+
+if __name__=='__main__':
+    if len(sys.argv) < 3:
+        print("USAGE:\n\tread_MISA.py <file_name> <architecture>")
+        exit()
+    inspect(sys.argv[1], sys.argv[2])
