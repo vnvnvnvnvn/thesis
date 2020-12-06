@@ -58,7 +58,7 @@ def pca(folder, vocab, num_blks, num_bits):
 
 if __name__=='__main__':
     if len(sys.argv) < 4:
-        print("USAGE:\n\tmake_transformer <vocab_file> <number_of_bits> <number_of_sublabels>")
+        print("USAGE:\n\tmake_transformer.py <vocab_file> <number_of_bits> <number_of_sublabels>")
         exit()
     random_projection(sys.argv[1], int(sys.argv[2]), int(sys.argv[3]))
     # pca(sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4]))

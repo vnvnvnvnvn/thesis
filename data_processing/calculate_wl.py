@@ -1,9 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from collections import defaultdict
-from sparse_vector import SparseVector
 import sys
-from sklearn import random_projection
 import numpy as np
 from numpy.linalg import norm
 import networkx as nx
@@ -11,10 +9,8 @@ import pickle as pkl
 from math import sqrt
 import os
 from itertools import product
-import scipy.stats as st
 import matplotlib.pyplot as plt
 import random
-from distance import hamming
 import copy
 
 transformer = None
@@ -28,13 +24,11 @@ def name_to_index(data):
     return lut
 
 def load_lut(vocab_file):
-    global lut
     with open(vocab_file) as wf:
         lut = name_to_index(wf.readlines())
     return lut
 
 def load_transformer(name):
-    global transformer
     with open(name, 'rb') as f:
         transformer = np.load(f)
     return transformer
@@ -48,14 +42,30 @@ def bag_to_vector(bag):
             continue
     return sv
 
+def bag_to_vector_no_lut(bag, vocab_name):
+    lut = load_lut(vocab_name)
+    sv = np.zeros((1, len(lut)))
+    for k, v in bag.items():
+        try:
+            sv[0][lut[k]] = v
+        except:
+            continue
+    return sv
+
 def list_to_bag(ls):
     bag = defaultdict(lambda: 0)
     for l in ls:
         bag[l] += 1
-        # bag[l] = 1
     return bag
 
 def random_hash(vector):
+    new_vector = (np.dot(vector, transformer.T) > 0).astype('int')
+    h = [''.join([str(y) for y in x]) for x in new_vector[0]]
+    h = tuple(h)
+    return h
+
+def random_hash_no_transformer(vector, transform_file):
+    transformer = load_transformer(transform_file)
     new_vector = (np.dot(vector, transformer.T) > 0).astype('int')
     h = [''.join([str(y) for y in x]) for x in new_vector[0]]
     h = tuple(h)
@@ -71,7 +81,7 @@ def normalise(A):
     lengths = ((A**2).sum(axis=1, keepdims=True)**.5)
     return A/lengths
 
-def calculate_wl(graph, k=4):
+def calculate_wl(graph, k=1):
     wl = {}
     for i in range(k):
         for node in graph.nodes(data='data'):
@@ -80,7 +90,6 @@ def calculate_wl(graph, k=4):
             else:
                 data = bag_to_vector(list_to_bag(node[1]))
             h = random_hash(data)
-            # h = tuple(*data.astype(int))
             if h in wl.keys():
                 wl[h] += 1
             else:
@@ -110,7 +119,7 @@ def orig_distance(f, thres, w1, w2):
         for k2 in w2.keys():
             scale += 1
             if f(k1, k2) >= thres:
-                dot += 1 #w1[k1] * w2[k2]
+                dot += 1
                 scale -= 1
     return dot * 1.0 / scale
 
@@ -129,13 +138,11 @@ def iou_distance(w1, w2):
     scale = len(set(w1.keys()).union(set(w2.keys()))) * 1.0
     return dot / scale
 
-def build_database(file_list, n=10000):
+def build_database(file_list, n=12000):
     database = {}
     cnt = 0
     for i in range(len(file_list)):
         graph = nx.read_gpickle(file_list[i])
-        if len(graph) < 10:
-            continue
         w = calculate_wl(graph)
         if len(w) == 0:
             continue
@@ -157,33 +164,48 @@ def generate_file_list_nested(folder):
     random.seed(42)
     files = []
     for subdir in os.listdir(folder):
+        if subdir == "Benign":
+            continue
         subdir_path = os.path.join(folder, subdir)
         files += [os.path.join(subdir_path, x) for x in os.listdir(subdir_path)]
     random.shuffle(files)
-    return files
+    benign_files = [os.path.join(folder, "Benign", x) for x in os.listdir(os.path.join(folder, "Benign"))]
+    benign_files += files
+    return benign_files
 
 def main():
+    if len(sys.argv) < 2:
+        print("USAGE:\n\tcalculate_wl.py <folder> [database_name] [vocab_file] [transformer_file]\n\tcalculate_wl.py <file_name>")
+        exit()
+
+    global transformer, lut
     vocab_file = "word_file_x86"
-    transformer = "transformer.npy"
+    transformer_file = "transformer.npy"
     db_name = "wl_db.pkl"
-
-    if len(sys.argv) > 2:
-        db_name = sys.argv[2]
-    if len(sys.argv) > 3:
-        vocab_file = sys.argv[3]
-    load_lut(vocab_file)
-    if len(sys.argv) > 4:
-        transformer = sys.argv[4]
-    load_transformer(transformer)
-
-    file_list = generate_file_list_nested(sys.argv[1])
-    db = build_database(file_list)
-    for k, v in db.items():
-        print(k)
-        print(v)
-        break
-    with open(db_name, 'wb') as handle:
-        pkl.dump(db, handle)
+    if os.path.isdir(sys.argv[1]):
+        if len(sys.argv) > 2:
+            db_name = sys.argv[2]
+        if len(sys.argv) > 3:
+            vocab_file = sys.argv[3]
+        lut = load_lut(vocab_file)
+        if len(sys.argv) > 4:
+            transformer_file = sys.argv[4]
+        transformer = load_transformer(transformer_file)
+        file_list = generate_file_list_nested(sys.argv[1])
+        # file_list = generate_file_list(sys.argv[1])
+        db = build_database(file_list)
+        with open(db_name, 'wb') as handle:
+            pkl.dump(db, handle)
+    else:
+        if len(sys.argv) > 2:
+            vocab_file = sys.argv[2]
+        lut = load_lut(vocab_file)
+        if len(sys.argv) > 3:
+            transformer_file = sys.argv[3]
+        transformer = load_transformer(transformer_file)
+        g = nx.read_gpickle(sys.argv[1])
+        wl = calculate_wl(g)
+        print(wl)
 
 if __name__=='__main__':
     main()
