@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 
 import pickle as pkl
-from calculate_wl import label_distance, iou_distance
+from calculate_wl import label_distance, iou_distance, calculate_wl, setup
 import time
 import sys
 from functools import partial
 import numpy as np
 from multiprocessing import Pool
+import os
+import networkx as nx
+from collections import defaultdict
 
 def calculate_distance(f, comp, item):
     k, v = item
     distance = f(comp, v)
     return (k, distance)
 
-def top_distance(f, db, item, idf_db={}, topk=10):
+def top_distance(f, db, item, topk=10):
     pool = Pool(processes=8, maxtasksperchild=10)
     distance_list = pool.map(partial(calculate_distance, f, item), db.items())
 
@@ -38,17 +41,18 @@ def isin(top, name):
         k, v = elem
         if k == name:
             continue
-        if k[:-2] == name[:-2] and v > 0.1:
+        if k[:-2] == name[:-2] and v > 0.01:
             return idx
     return None
 
 def mean_ap(top, name, name_list):
+    name = os.path.basename(name)
     relevant_doc = 0
     for i in range(4):
         relevant_name = name[:-1] + str(i)
         if relevant_name in name_list:
             relevant_doc += 1
-    if relevant_doc == 1:
+    if relevant_doc <= 1:
         return None
     correct_so_far = 0
     num_so_far = 0
@@ -62,39 +66,63 @@ def mean_ap(top, name, name_list):
             ap += correct_so_far * 1.0 / num_so_far
     return ap / (relevant_doc - 1)
 
-def main():
-    db_name = sys.argv[1]
-    test_num = int(sys.argv[2])
-    handle = open(db_name, 'rb')
-    db = pkl.load(handle)
-    handle.close()
-    print("Finished loading")
-    print("Testing bag of words")
-    cnt = 0
-    item_list = list(db.items())
-    # random.shuffle(item_list)
-    ap_list = []
-    name_list = set(db.keys())
-    for k, v in item_list[:test_num]:
-        start = time.clock()
-        closest_k = top_distance(iou_distance, db, v)
-        if cnt % 10 == 0:
-            print("Done with " + str(cnt))
-        cnt += 1
-        ap_list.append(mean_ap(closest_k, k, name_list))
-    #     correct = isin(closest_k, k)
-    #     if correct is not None:
-    #         print(k+" "+closest_k[correct][0]+": "+str(closest_k[correct][1])+ " @"+str(correct))
-    #         cnt += 1
-    #     for c in closest_k:
-    #         if c[0] != k:
-    #             print(k+" closest to "+c[0]+": "+str(c[1]))
-    #             break
-    # print(cnt*1.0/test_num)
-    print(ap_list)
-    print(closest_k)
-    # print(np.mean(ap_list))
-    # print(len(np.where(np.asarray(ap_list) < 0.01)[0]))
+def classify_malware(name_list, name):
+    counter = defaultdict(lambda: 0)
+    for n, v in name_list:
+        if name == n:
+            continue
+        c = n.split("/")
+        if c[1] == "Benign":
+            counter["not_malware"] += 1
+        else:
+            counter["malware"] += 1
+    s = sorted(counter.items(), key=lambda x: x[1], reverse=True)
+    if s[0][1] == len(name_list) // 2:
+        return 'unsure'
+    return s[0][0]
 
+def classify_malware_type(name_list, name):
+    counter = defaultdict(lambda: 0)
+    for n, v in name_list:
+        if name == n:
+            continue
+        c = n.split("/")
+        counter[c[1]] += 1
+    s = sorted(counter.items(), key=lambda x: x[1], reverse=True)
+    if s[0][1] == len(name_list) // 5:
+        return 'unsure'
+    return s[0][0]
+
+def main():
+    if len(sys.argv) < 3:
+        print("USAGE:\n\ttop10.py <database_name> <folder_name> [vocab_file] [transformer_file]")
+        exit()
+    vocab_file = "word_file_x86"
+    transformer_file = "transformer.npy"
+    if len(sys.argv) > 3:
+        vocab_file = sys.argv[3]
+    if len(sys.argv) > 4:
+        transformer_file = sys.argv[4]
+    setup(vocab_file, transformer_file)
+
+    db_name = sys.argv[1]
+    classify_folder = sys.argv[2]
+    with open(db_name, 'rb') as handle:
+        db = pkl.load(handle)
+    todo = [os.path.join(classify_folder, x) for x in os.listdir(classify_folder)]
+    classify_result = {}
+    for f in todo:
+        start = time.clock()
+        g = nx.read_gpickle(f)
+        wl = calculate_wl(g)
+        closest_k = top_distance(iou_distance, db, wl, 10)
+        #print(closest_k)
+        classify_result[f] = mean_ap(closest_k, f, db.keys())
+        #classify_result[f] = classify_malware(closest_k, f)
+        #classify_result[f] = classify_malware_type(closest_k, f)
+    #print(classify_result)
+    for name, score in classify_result.items():
+        if score is not None:
+            print(name + ":" + str(score))
 if __name__=='__main__':
     main()

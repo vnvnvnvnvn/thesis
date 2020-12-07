@@ -109,14 +109,13 @@ def generate_graph(json_folder, saved_dir, data):
         nx.write_gpickle(g, simp_saved_path)
     return simp_saved_path
 
-def generate_graph_nonrec(saved_dir, file_name):
+def generate_graph_nonrec(saved_subdir, saved_dir, file_name):
     name = os.path.basename(file_name)
     g, jmp_pts = json_to_graph(file_name)
     if len(g.nodes()) == 0:
         return
     saved_path = os.path.join(saved_dir, name)
     nx.write_gpickle(g, saved_path)
-    saved_subdir = os.path.join(os.getcwd(), "simp_vsgraphs", "Benign")
     for d in g.nodes(data=True):
         if 'data' not in d[1].keys():
             d[1]['data'] = []
@@ -137,11 +136,10 @@ def process_all_virus_data(json_folder):
     with ProcessPoolExecutor(10) as ex:
         ex.map(partial(generate_graph, json_folder, virus_saved_dir), data_arch.items())
 
-def process_benign_data(json_folder):
-    benign_saved_dir = os.path.join(os.getcwd(), "benign_graphs", "x86")
+def process_benign_data(json_folder, benign_saved_dir, saved_subdir):
     todo = [os.path.join(json_folder, x) for x in os.listdir(json_folder)]
     with ProcessPoolExecutor(10) as ex:
-        ex.map(partial(generate_graph_nonrec, saved_dir), todo)
+        ex.map(partial(generate_graph_nonrec, saved_subdir, benign_saved_dir), todo)
 
 def generate_vocab(folder):
     vocab = defaultdict(lambda:0)
@@ -168,10 +166,17 @@ def generate_vocab(folder):
     return vocab_path
 
 def main():
-    if len(sys.argv) < 3:
-        print("USAGE:\n\tread_VS.py <json_virus_folder> <json_benign_folder>")
+    if len(sys.argv) < 2:
+        print("USAGE:\n\tread_VS.py <json_folder>\n\tread_VS.py <json_virus_folder> <json_benign_folder>")
         exit()
-    process_benign_data(sys.argv[2])
+    if len(sys.argv) == 2:
+        benign_saved_dir = os.path.join(os.getcwd(), "example_graphs")
+        saved_subdir = os.path.join(os.getcwd(), "simplified_example")
+        process_benign_data(sys.argv[1], benign_saved_dir, saved_subdir)
+        exit()
+    benign_saved_dir = os.path.join(os.getcwd(), "benign_graphs", "x86")
+    saved_subdir = os.path.join(os.getcwd(), "simp_vsgraphs", "Benign")
+    process_benign_data(sys.argv[2], benign_saved_dir, saved_subdir)
     process_all_virus_data(sys.argv[1])
     generate_vocab(os.path.join(os.getcwd(), "simp_vsgraphs"))
 

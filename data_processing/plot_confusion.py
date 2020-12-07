@@ -24,13 +24,20 @@ def read_file(name):
                 start = l.find("{")
                 end = l.find("}")
                 saved_data[name] = ast.literal_eval(l[start:end+1])
+        correct = 0
+        total = 0
         for name, value in saved_data.items():
             df = pd.DataFrame(data=0, index=["Virus","Worm","Backdoor","Trojan","Adware"],
                               columns=["Virus","Worm","Backdoor","Trojan","Adware"], dtype=int, copy=False)
             for k, v in value.items():
                 df[k[0]][k[1]] = v
+                if k[0] == k[1]:
+                    correct += v
+                total += v
             plt.figure(figsize = (10,7))
-            title = "_".join([name[0], name[1]])
+            perc = correct * 1.0 / total
+            title = "_".join([name[0], name[1], str(perc)])
+            print("Correct: " + str(perc))
             plt.title(title)
             sn.heatmap(df, annot=True)
             plt.savefig(title+".png")
@@ -66,5 +73,7 @@ def read_file_detect(name):
 
 def main():
     read_file_detect(sys.argv[1])
+    # read_file(sys.argv[1])
+
 if __name__=='__main__':
     main()

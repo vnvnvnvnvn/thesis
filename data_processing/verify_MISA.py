@@ -53,7 +53,7 @@ def generate_vocab(folder):
 def generate_data(folder):
     arch = folder.split("/")[-1]
     files = [os.path.join(folder, x) for x in os.listdir(folder)]
-    saved_dirname = os.path.join(os.getcwd(), "graphs", arch)
+    saved_dirname = os.path.join(os.getcwd(), "example_graphs_MISA", arch)
     for i in range(len(files)):
         fns = rmisa.read_file(files[i], arch)
         rmisa.save_file(files[i], arch, fns, saved_dirname)
@@ -61,7 +61,7 @@ def generate_data(folder):
 
 def generate_simplified_graph(simp, folder):
     arch = folder.split("/")[-1]
-    saved_dirname = os.path.join(os.getcwd(), "simp_graphs", arch)
+    saved_dirname = os.path.join(os.getcwd(),"simplified_example_MISA", arch)
     cnt = 0
     for f in os.listdir(folder):
         cnt += 1

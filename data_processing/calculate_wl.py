@@ -173,12 +173,16 @@ def generate_file_list_nested(folder):
     benign_files += files
     return benign_files
 
+def setup(vocab_file, transformer_file):
+    global transformer, lut
+    lut = load_lut(vocab_file)
+    transformer = load_transformer(transformer_file)
+
 def main():
     if len(sys.argv) < 2:
         print("USAGE:\n\tcalculate_wl.py <folder> [database_name] [vocab_file] [transformer_file]\n\tcalculate_wl.py <file_name>")
         exit()
 
-    global transformer, lut
     vocab_file = "word_file_x86"
     transformer_file = "transformer.npy"
     db_name = "wl_db.pkl"
@@ -187,10 +191,9 @@ def main():
             db_name = sys.argv[2]
         if len(sys.argv) > 3:
             vocab_file = sys.argv[3]
-        lut = load_lut(vocab_file)
         if len(sys.argv) > 4:
             transformer_file = sys.argv[4]
-        transformer = load_transformer(transformer_file)
+        setup(vocab_file, transformer_file)
         file_list = generate_file_list_nested(sys.argv[1])
         # file_list = generate_file_list(sys.argv[1])
         db = build_database(file_list)
@@ -199,10 +202,9 @@ def main():
     else:
         if len(sys.argv) > 2:
             vocab_file = sys.argv[2]
-        lut = load_lut(vocab_file)
         if len(sys.argv) > 3:
             transformer_file = sys.argv[3]
-        transformer = load_transformer(transformer_file)
+        setup(vocab_file, transformer_file)
         g = nx.read_gpickle(sys.argv[1])
         wl = calculate_wl(g)
         print(wl)

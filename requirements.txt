@@ -3,6 +3,6 @@ pandas
 seaborn
 scipy
 numpy
-sparse_vector
+r2pipe
 sklearn
 distance
