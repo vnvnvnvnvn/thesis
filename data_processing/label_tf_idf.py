@@ -36,7 +36,8 @@ def main():
     # db_list = ["wl_arm_db_", "wl_x86_db_"]
     # code_len_list = ["8", "16", "32", "64"]
     # data_list = product(db_list, code_len_list)
-    data_list = ["1_wl_x86_db_32"]
+    # data_list = ["1_wl_x86_db_32"]
+    data_list = ["benign"]
     for db in data_list:
         name = "".join([db, ".pkl"])
         tf_idf(name)

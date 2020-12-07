@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from top10 import *
 import pickle as pkl
@@ -14,6 +14,29 @@ def generate_test_data(item_list, number, exclude=False):
     ret_data = []
     for k, v in item_list:
         if exclude and k[-1] == '0':
+            continue
+        ret_data.append((k, v))
+        cnt += 1
+        if cnt >= number:
+            break
+    return ret_data
+
+def generate_test_data_2(item_list, number, exclude=False):
+    cnt = 0
+    ret_data = []
+    for k, v in item_list:
+        orig_class = k.split("/")[1]
+        if orig_class == "Benign":
+            ret_data.append((k, v))
+            cnt += 1
+        if cnt >= number // 2:
+            break
+
+    for k, v in item_list:
+        if exclude and k[-1] == '0':
+            continue
+        orig_class = k.split("/")[1]
+        if orig_class == "Benign":
             continue
         ret_data.append((k, v))
         cnt += 1
@@ -74,11 +97,53 @@ def process_data_vs(f, data, test_data):
 
     for k, v in test_data:
         start = time.clock()
-        closest_k = top_distance(f, data, v, {}, 11)
+        closest_k = top_distance(f, data, v, {}, 5)
         time_list.append(time.clock() - start)
         result_list[k] = classify(closest_k, k)
     for name, res in result_list.items():
         orig_class = name.split("/")[1]
+        total_result[(orig_class, res)] += 1
+    mean_time = np.mean(time_list)
+    var_time = np.var(time_list)
+    print(str(mean_time) + " " +
+          str(var_time))
+    print(total_result)
+
+def process_data_vs_2(f, data, test_data):
+    total_result = defaultdict(lambda: 0)
+    cnt = 0
+    def classify(name_list, name):
+        counter = defaultdict(lambda: 0)
+        for n, v in name_list:
+            if name == n:
+                continue
+            c = n.split("/")
+            if c[1] == "Benign":
+                counter["not_malware"] += 1
+            else:
+                counter["malware"] += 1
+        s = sorted(counter.items(), key=lambda x: x[1], reverse=True)
+        if s[0][1] == 2:
+            return 'unsure'
+        return s[0][0]
+
+    time_list = []
+    result_list = {}
+
+    for k, v in test_data:
+        cnt += 1
+        start = time.clock()
+        closest_k = top_distance(f, data, v, {}, 6)
+        time_list.append(time.clock() - start)
+        result_list[k] = classify(closest_k, k)
+        if cnt % 10 == 0:
+            print(cnt)
+    for name, res in result_list.items():
+        orig_class = name.split("/")[1]
+        if orig_class == "Benign":
+            orig_class = "not_malware"
+        else:
+            orig_class = "malware"
         total_result[(orig_class, res)] += 1
     mean_time = np.mean(time_list)
     var_time = np.var(time_list)
@@ -105,8 +170,8 @@ def result_database(f, dbname, idfdb_name=None, test_num=100):
                 updated_item_list.append((k, new_v))
         else:
             updated_item_list = item_list
-        test_data = generate_test_data(updated_item_list, test_num)
-        process_data(f, data, test_data)
+        test_data = generate_test_data_2(updated_item_list, test_num)
+        process_data_vs_2(f, data, test_data)
 
 def experiment_misa_code_len(num, expr="IOU"):
     # db_list = ["wl_arm_db_", "wl_x86_db_"]
@@ -149,7 +214,8 @@ def experiment_vs_k(num, expr="IOU"):
         "BOL": label_distance,
         "TF_IDF": label_distance
     }
-    core = "vs_db_32"
+    # core = "vs_db_32"
+    core = "benign"
     front = [""]
     # front = ["big", ""]
     end = ["_4", ""]
@@ -170,10 +236,12 @@ def experiment_vs_k(num, expr="IOU"):
 
 
 def main():
+    experiment_vs_k(int(sys.argv[1]), "IOU")
+    # experiment_vs_k(int(sys.argv[1]), "BOL")
     # experiment_vs_k(int(sys.argv[1]), "TF_IDF")
-    experiment_misa_code_len(int(sys.argv[1]), "BOL")
-    experiment_misa_code_len(int(sys.argv[1]), "IOU")
-    experiment_misa_code_len(int(sys.argv[1]), "TF_IDF")
+    # experiment_misa_code_len(int(sys.argv[1]), "BOL")
+    # experiment_misa_code_len(int(sys.argv[1]), "IOU")
+    # experiment_misa_code_len(int(sys.argv[1]), "TF_IDF")
 
 if __name__=='__main__':
     main()

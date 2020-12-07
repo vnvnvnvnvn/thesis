@@ -1,12 +1,12 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import pickle as pkl
 from calculate_wl import label_distance, iou_distance
 import time
 import sys
-from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 import numpy as np
+from multiprocessing import Pool
 
 def calculate_distance(f, comp, item):
     k, v = item
@@ -14,14 +14,12 @@ def calculate_distance(f, comp, item):
     return (k, distance)
 
 def top_distance(f, db, item, idf_db={}, topk=10):
-    distance_list = []
-    with ProcessPoolExecutor(10) as ex:
-        distance_list.append(ex.map(partial(calculate_distance, f, item), list(db.items())))
+    pool = Pool(processes=8, maxtasksperchild=10)
+    distance_list = pool.map(partial(calculate_distance, f, item), db.items())
 
     distance_data = {}
     for dl in distance_list:
-        for d in dl:
-            distance_data[d[0]] = d[1]
+        distance_data[dl[0]] = dl[1]
     closest = sorted(distance_data.items(), key=lambda x: x[1], reverse=True)
     start_idx = 0
     for i in range(len(closest)):
@@ -30,6 +28,9 @@ def top_distance(f, db, item, idf_db={}, topk=10):
             break
     if start_idx < 0:
         start_idx = 0
+    pool.terminate()
+    pool.join()
+    del pool
     return closest[:start_idx+topk]
 
 def isin(top, name):
