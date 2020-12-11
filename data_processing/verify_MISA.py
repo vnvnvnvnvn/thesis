@@ -94,7 +94,7 @@ def main():
     parser.add_argument('--example_simplified', default='example_simplified_MISA', help='Folder de save simplified example graph')
     parser.add_argument('--visualize', action='store_true', help='Visualize a graph')
     parser.add_argument('--inspect', action='store_true', help='In cac basic blocks')
-    parser.add_argument('--number_of_graphs', default=2, help='So graph muon ve hoac in')
+    parser.add_argument('--number_of_graphs', default=2, help='So graph muon ve hoac in', type=int)
     args = parser.parse_args()
 
     if args.all and args.folder:
