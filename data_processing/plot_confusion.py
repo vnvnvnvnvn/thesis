@@ -54,23 +54,30 @@ def read_file(name):
                 saved_data[name] = ast.literal_eval(l[start:end+1])
     return saved_data
 
+
+def plot_confusion_matrix(df, title, save=False):
+    plt.figure(figsize = (10,7))
+    sn.heatmap(df, annot=True)
+    plt.title(title)
+    if save:
+        plt.savefig(title+".png")
+    else:
+        plt.show()
+
 def read_file_classify(file_name):
     saved_data = read_file(file_name)
     for name, value in saved_data.items():
         df, perc = process_classification_result(value)
-        plt.figure(figsize = (10,7))
-        title = "_".join([name[0], name[1], str(perc)])
-        print("Correct: " + str(perc))
-        plt.title(title)
-        sn.heatmap(df, annot=True)
-        plt.savefig(title+".png")
+        title = "_".join(list(name) + [str(perc)])
+        print(str(name)+ ": " + str(perc))
+        plot_confusion_matrix(df, title, True)
 
 def read_file_detect(file_name):
     saved_data = read_file(file_name)
     for name, value in saved_data.items():
         precision, recall, f1 = process_detection_result(value)
         print(name)
-        print(str(precision) + " " + str(recall) + " " + str(f1))
+        print(str(precision) + "\t" + str(recall) + "\t" + str(f1))
 
 def main():
     parser = argparse.ArgumentParser(description="""Ve bieu do tu ket qua thi nghiem classify va in ket qua precision recall cho thi nghiem detect""")

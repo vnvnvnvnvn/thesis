@@ -147,12 +147,12 @@ def tf_distance(idf, w1, w2):
         w1[k] = idf[k] * v * 1.0 / wc
     return label_distance(w1, w2)
 
-def build_database(file_list, n=12000):
+def build_database(file_list, n=12000, loop=1):
     database = {}
     cnt = 0
     for i in range(len(file_list)):
         graph = nx.read_gpickle(file_list[i])
-        w = calculate_wl(graph)
+        w = calculate_wl(graph, loop)
         if len(w) == 0:
             continue
         cnt += 1
@@ -196,6 +196,7 @@ def main():
     parser.add_argument('--file', action='append', help='Cac file can xu ly')
     parser.add_argument('--vocab', default='word_file_x86', help='Duong dan den vocab')
     parser.add_argument('--transformer', default='transformer.npy', help='Duong dan den LSH transformer')
+    parser.add_argument('--loop', default=1, help='So lan loop cho WL hash')
     args = parser.parse_args()
     setup(args.vocab, args.transformer)
 
@@ -204,13 +205,13 @@ def main():
             file_list = generate_file_list_nested(args.folder, args.benign)
         else:
             file_list = generate_file_list(args.folder)
-        db = build_database(file_list, args.number_of_files)
+        db = build_database(file_list, args.number_of_files, args.loop)
         with open(args.database, 'wb') as handle:
             pkl.dump(db, handle)
     if args.file:
         for name in file:
             g = nx.read_gpickle(name)
-            wl = calculate_wl(g)
+            wl = calculate_wl(g, args.loop)
             print(wl)
 
 

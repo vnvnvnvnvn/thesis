@@ -1,27 +1,25 @@
 #!/usr/bin/env python3
 
+import argparse
 from top10 import *
 import pickle as pkl
-from itertools import product
-from calculate_wl import label_distance, iou_distance
+from itertools import product, islice
+from functools import partial
+from calculate_wl import label_distance, iou_distance, tf_distance
 from collections import defaultdict
 from ga_ged import ga
 import networkx as nx
 import os
+from plot_confusion import process_detection_result, process_classification_result, plot_confusion_matrix
 
-def generate_test_data(item_list, number, exclude=False):
-    cnt = 0
+
+def generate_test_data(item_list, number):
     ret_data = []
-    for k, v in item_list:
-        if exclude and k[-1] == '0':
-            continue
+    for k, v in islice(item_list, number):
         ret_data.append((k, v))
-        cnt += 1
-        if cnt >= number:
-            break
     return ret_data
 
-def generate_test_data_2(item_list, number, exclude=False):
+def generate_detect_data(item_list, number):
     cnt = 0
     ret_data = []
     for k, v in item_list:
@@ -33,8 +31,6 @@ def generate_test_data_2(item_list, number, exclude=False):
             break
 
     for k, v in item_list:
-        if exclude and k[-1] == '0':
-            continue
         orig_class = k.split("/")[1]
         if orig_class == "Benign":
             continue
@@ -44,48 +40,47 @@ def generate_test_data_2(item_list, number, exclude=False):
             break
     return ret_data
 
-def process_data(f, data, test_data):
+
+def process_retrieve_data(f, data, test_data, ged=None, neighbors=10):
     name_list = set(data.keys())
-    ap_list = []
     time_list = []
     result_list = {}
 
     for k, v in test_data:
         start = time.clock()
+        closest_k = top_distance(f, data, v, neighbors)
 
-        ged_g1 = nx.read_gpickle(os.path.join("ged_x86_misa", k))
-        closest_k = top_distance(f, data, v)
-        ged_order = {}
-        for cand, dist in closest_k:
-            ged_g2 = nx.read_gpickle(os.path.join("ged_x86_misa", cand))
-            ged_dist, _, _ = ga(ged_g1, ged_g2, 1)
-            ged_order[cand] = ged_dist
-        ged_sorted = sorted(ged_order.items(), key=lambda x: x[1])
-
-        cur_map = mean_ap(ged_sorted, k, name_list)
+        if ged is not None:
+            ged_g1 = nx.read_gpickle(os.path.join(ged, k))
+            ged_order = {}
+            for cand, dist in closest_k:
+                ged_g2 = nx.read_gpickle(os.path.join(ged, cand))
+                ged_dist, _, _ = ga(ged_g1, ged_g2, 1)
+                ged_order[cand] = ged_dist
+            ged_sorted = sorted(ged_order.items(), key=lambda x: x[1])
+            cur_map = mean_ap(name_list, ged_sorted, k)
+        else:
+            cur_map = mean_ap(name_list, closest_k, k)
         if cur_map is None:
             continue
         time_list.append(time.clock() - start)
         result_list[k] = cur_map
-        ap_list.append(cur_map)
 
-    ma = np.mean(ap_list)
-    var_ap = np.var(ap_list)
+    ma = np.mean(list(result_list.values()))
     mean_time = np.mean(time_list)
     var_time = np.var(time_list)
-    print(str(ma) + " " +
-          str(mean_time) + " " +
-          str(var_time))
-    print(len(np.where(np.asarray(ap_list) < 0.01)[0]))
+    no_result = len(np.where(np.asarray(list(result_list.values())) < 0.01)[0])
+    return ma, no_result, mean_time, var_time
 
-def process_data_vs(f, data, test_data):
+
+def process_classify_data(f, data, test_data, neighbors=11):
     total_result = defaultdict(lambda: 0)
     time_list = []
     result_list = {}
 
     for k, v in test_data:
         start = time.clock()
-        closest_k = top_distance(f, data, v, 10)
+        closest_k = top_distance(f, data, v, neighbors)
         time_list.append(time.clock() - start)
         result_list[k] = classify_malware_type(closest_k, k)
     for name, res in result_list.items():
@@ -93,24 +88,19 @@ def process_data_vs(f, data, test_data):
         total_result[(orig_class, res)] += 1
     mean_time = np.mean(time_list)
     var_time = np.var(time_list)
-    print(str(mean_time) + " " +
-          str(var_time))
-    print(total_result)
+    return total_result, mean_time, var_time
 
-def process_data_vs_2(f, data, test_data):
+
+def process_detect_data(f, data, test_data, neighbors=6):
     total_result = defaultdict(lambda: 0)
-    cnt = 0
     time_list = []
     result_list = {}
 
     for k, v in test_data:
-        cnt += 1
         start = time.clock()
-        closest_k = top_distance(f, data, v, 6)
+        closest_k = top_distance(f, data, v, neighbors)
         time_list.append(time.clock() - start)
         result_list[k] = classify_malware(closest_k, k)
-        if cnt % 10 == 0:
-            print(cnt)
     for name, res in result_list.items():
         orig_class = name.split("/")[1]
         if orig_class == "Benign":
@@ -120,148 +110,103 @@ def process_data_vs_2(f, data, test_data):
         total_result[(orig_class, res)] += 1
     mean_time = np.mean(time_list)
     var_time = np.var(time_list)
-    print(str(mean_time) + " " +
-          str(var_time))
-    print(total_result)
+    return total_result, mean_time, var_time
 
-def result_database(f, dbname, idfdb_name=None, test_num=100):
-    idf_db = {}
-    if idfdb_name is not None:
-        with open(idfdb_name, 'rb') as idf_handle:
-            idf_db = pkl.load(idf_handle)
 
-    with open(dbname, 'rb') as handle:
-        data = pkl.load(handle)
-        item_list = list(data.items())
-        updated_item_list = []
-        if len(idf_db) > 0:
-            for k, v in item_list:
-                new_v = {}
-                for label, freq in v.items():
-                    new_data = freq * idf_db[label]
-                    new_v[label] = new_data
-                updated_item_list.append((k, new_v))
-        else:
-            updated_item_list = item_list
-        test_data = generate_test_data_2(updated_item_list, test_num)
-        process_data_vs_2(f, data, test_data)
-
-def result_database_class(f, dbname, idfdb_name=None, test_num=100):
-    idf_db = {}
-    if idfdb_name is not None:
-        with open(idfdb_name, 'rb') as idf_handle:
-            idf_db = pkl.load(idf_handle)
-
-    with open(dbname, 'rb') as handle:
-        data = pkl.load(handle)
-        item_list = list(data.items())
-        updated_item_list = []
-        if len(idf_db) > 0:
-            for k, v in item_list:
-                new_v = {}
-                for label, freq in v.items():
-                    new_data = freq * idf_db[label]
-                    new_v[label] = new_data
-                updated_item_list.append((k, new_v))
-        else:
-            updated_item_list = item_list
-        test_data = generate_test_data_2(updated_item_list, test_num)
-        process_data_vs(f, data, test_data)
-
-def experiment_misa_code_len(num, expr="IOU"):
-    # db_list = ["wl_arm_db_", "wl_x86_db_"]
-    # code_len_list = ["8", "16", "32", "64"]
-    code_len_list = ["32"]
-    # core = "wl_x86_db_32"
-    # front = ["big_", "small_"]
-    # end = ["_4", ""]
-    # data_list = product(db_list, code_len_list)
-    # data_list = product(front, end)
-    core = "wl_x86_db_"
-    data_list = code_len_list
+def retrieve_experiment(ged, num, database_list, save_file, expr="IOU", neighbors=10):
     func = {
         "IOU": iou_distance,
         "BOL": label_distance,
         "IDF": label_distance
     }
 
-    if expr == "IDF":
-        print(expr)
-        for db in data_list:
-            # name = "".join([db[0], db[1], ".pkl"])
-            # idf_name = "".join([db[0], db[1], "_idf.pkl"])
-            name = "".join([core, db, ".pkl"])
-            idf_name = "".join([core, db, "_idf.pkl"])
-            print(name)
-            result_database(func[expr], name, idf_name, num)
-    else:
-        print(expr)
-        for db in data_list:
-            # name = "".join([db[0], db[1], ".pkl"])
-            # name = "".join([db[0], core, db[1], ".pkl"])
-            name = "".join([core, db, ".pkl"])
-            print(name)
-            result_database(func[expr], name, None, num)
+    result_data = [expr]
+    for db in database_list:
+        result_data.append(db)
+        with open(db, 'rb') as handle:
+            data = pkl.load(handle)
+        test_data = generate_test_data(data, num)
+        result, no_answer, mt, vt = process_retrieve_data(func[expr], data, test_data, ged)
+        result_data.append(str(mt) + "\t" + str(vt))
+        result_data.append(str(result) + "\t" + str(no_answer))
+    with open(save_file, 'a+') as f:
+        f.write("\n".join(result_data))
 
-def experiment_vs_k(num, expr="IOU"):
+
+def classify_experiment(plot, num, database_list, save_file, expr="IOU", neighbors=11):
     func = {
         "IOU": iou_distance,
         "BOL": label_distance,
         "IDF": label_distance
     }
-    # core = "vs_db_32"
-    core = "benign"
-    front = [""]
-    # front = ["big", ""]
-    end = ["_4", ""]
-    addon = product(front, end)
-    if expr == "IDF":
-        print(expr)
-        for a in addon:
-            name = "".join([a[0], core, a[1], ".pkl"])
-            idf_name = "".join([a[0], core, a[1], "_idf.pkl"])
-            print(name)
-            result_database(func[expr], name, idf_name, num)
-    else:
-        print(expr)
-        for a in addon:
-            name = "".join([a[0], core, a[1], ".pkl"])
-            print(name)
-            result_database(func[expr], name, None, num)
 
-def experiment_vs_k_class(num, expr="IOU"):
+    result_data = [expr]
+    for db in database_list:
+        result_data.append(db)
+        with open(db, 'rb') as handle:
+            data = pkl.load(handle)
+        test_data = generate_test_data(data, num)
+        result, mt, vt = process_classify_data(func[expr], data, test_data)
+        result_data.append(str(mt) + "\t" + str(vt))
+        result_data.append(str(result))
+        if plot:
+            df, _ = process_classification_result(result)
+            plot_confusion_matrix(df, expr)
+    with open(save_file, 'a+') as f:
+        f.write("\n".join(result_data))
+
+
+def detect_experiment(plot, num, database_list, save_file, expr="IOU", neighbors=6):
     func = {
         "IOU": iou_distance,
         "BOL": label_distance,
         "IDF": label_distance
     }
-    core = "vs_db_32"
-    front = [""]
-    # front = ["big", ""]
-    end = ["_4", ""]
-    addon = product(front, end)
-    if expr == "IDF":
-        print(expr)
-        for a in addon:
-            name = "".join([a[0], core, a[1], ".pkl"])
-            idf_name = "".join([a[0], core, a[1], "_idf.pkl"])
-            print(name)
-            result_database_class(func[expr], name, idf_name, num)
-    else:
-        print(expr)
-        for a in addon:
-            name = "".join([a[0], core, a[1], ".pkl"])
-            print(name)
-            result_database_class(func[expr], name, None, num)
+
+    result_data = [expr]
+    for db in database_list:
+        result_data.append(db)
+        with open(db, 'rb') as handle:
+            data = pkl.load(handle)
+        test_data = generate_detect_data(data, num)
+        result, mt, vt = process_detect_data(func[expr], data, test_data)
+        result_data.append(str(mt) + "\t" + str(vt))
+        result_data.append(str(result))
+        if plot:
+            print(process_detection_result(result))
+    with open(save_file, 'a+') as f:
+        f.write("\n".join(result_data))
+
 
 def main():
-    experiment_vs_k(int(sys.argv[1]), "IOU")
-    # experiment_vs_k_class(int(sys.argv[1]), "IOU")
-    # experiment_vs_k(int(sys.argv[1]), "BOL")
-    # experiment_vs_k(int(sys.argv[1]), "IDF")
-    # experiment_misa_code_len(int(sys.argv[1]), "BOL")
-    # experiment_misa_code_len(int(sys.argv[1]), "IOU")
-    # experiment_misa_code_len(int(sys.argv[1]), "IDF")
+    parser = argparse.ArgumentParser(description="""Chay cac thi nghiem tren database da tao ra tu truoc""")
+    parser.add_argument('--query', type=int, default=1000, help='So luong queries muon thuc hien')
+    parser.add_argument('--core', action='append', help='Ten cua database can xu ly', required=True)
+    parser.add_argument('--prefix', action='append', default=[""], help='Prefix cua cac database muon xu ly')
+    parser.add_argument('--postfix', action='append', default=[""], help='Postfix cua cac database muon xu ly')
+    parser.add_argument('-t', '--task', choices=['detect', 'classify', 'retrieve'], default='detect', help='Task muon thu')
+    parser.add_argument('--number_of_neighbors', default=10, type=int, help='So nearest neighbors duoc vote')
+    parser.add_argument('--distance_type', choices=['iou', 'cosine', 'idf'], default='iou', help='Phep tinh do tuong dong')
+    parser.add_argument('--file', help='File de viet ket qua', required=True)
+    parser.add_argument('--visualize', default=False, help='Plot confusion matrix', type=bool)
+    parser.add_argument('--ged', help='GED graph folder')
+    args = parser.parse_args()
+
+    task_lookup = {
+        'classify': partial(classify_experiment, args.visualize),
+        'detect': partial(detect_experiment, args.visualize),
+        'retrieve': partial(retrieve_experiment, args.ged)
+    }
+
+    distance_lookup = {
+        'iou': 'IOU',
+        'cosine': 'BOL',
+        'idf': 'IDF'
+    }
+
+    database_list = product(args.prefix, args.core, args.postfix)
+
+    task_lookup[args.task](args.query, database_list, args.file, distance_lookup[args.distance_type], args.number_of_neighbors)
 
 if __name__=='__main__':
     main()

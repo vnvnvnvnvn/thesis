@@ -60,7 +60,7 @@ def main():
 
     data_list = product(args.prefix, args.core, args.postfix)
     for db in data_list:
-        name = "".join(db + [".pkl"])
+        name = "".join(list(db) + [".pkl"])
         tf_idf(name)
 
 if __name__=='__main__':
