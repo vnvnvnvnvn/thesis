@@ -150,8 +150,10 @@ def classify_experiment(plot, num, database_list, save_file, expr="IOU", neighbo
         result_data.append(str(mt) + "\t" + str(vt))
         result_data.append(str(result)+"\n")
         if plot:
-            df, _ = process_classification_result(result)
+            df, perc = process_classification_result(result)
+            print(perc)
             plot_confusion_matrix(df, expr)
+            result_data.append(str(perc)+"\n")
     with open(save_file, 'a+') as f:
         f.write("\n".join(result_data))
 
@@ -186,9 +188,9 @@ def main():
     parser.add_argument('--postfix', action='append', default=[""], help='Postfix cua cac database muon xu ly')
     parser.add_argument('-t', '--task', choices=['detect', 'classify', 'retrieve'], default='detect', help='Task muon thu')
     parser.add_argument('-n', '--number_of_neighbors', default=10, type=int, help='So nearest neighbors duoc vote')
-    parser.add_argument('--distance_type', choices=['iou', 'cosine', 'idf'], default='iou', help='Phep tinh do tuong dong')
-    parser.add_argument('--file', help='File de viet ket qua', required=True)
-    parser.add_argument('--visualize', action='store_true', help='Plot confusion matrix')
+    parser.add_argument('-d', '--distance_type', choices=['iou', 'cosine', 'idf'], default='iou', help='Phep tinh do tuong dong')
+    parser.add_argument('-f', '--file', help='File de viet ket qua', required=True)
+    parser.add_argument('-v', '--visualize', action='store_true', help='Plot confusion matrix')
     parser.add_argument('--ged', help='GED graph folder')
     args = parser.parse_args()
 

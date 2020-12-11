@@ -188,15 +188,15 @@ def setup(vocab_file, transformer_file):
 
 def main():
     parser = argparse.ArgumentParser(description="""Tinh WL hash tu simplified graph, save vao database neu xu ly ca folder. Cung co the duoc su dung de in thu WL hash cua mot so files don le""")
-    parser.add_argument('--folder', help='Duong dan den folder can xu li')
-    parser.add_argument('--database', help='Ten cua database ket qua')
+    parser.add_argument('-f', '--folder', help='Duong dan den folder can xu li')
+    parser.add_argument('-d', '--database', help='Ten cua database ket qua')
     parser.add_argument('-n', '--number_of_files', default=12000, type=int, help='So luong file se co trong database')
     parser.add_argument('--benign', action='store_true', help='Them cac file lanh vao database')
     parser.add_argument('--nested', action='store_true', help='Folder da cho co nested khong')
     parser.add_argument('--file', action='append', help='Cac file can xu ly')
-    parser.add_argument('--vocab', default='word_file_x86', help='Duong dan den vocab')
-    parser.add_argument('--transformer', default='transformer.npy', help='Duong dan den LSH transformer')
-    parser.add_argument('--loop', default=1, help='So lan loop cho WL hash', type=int)
+    parser.add_argument('-v', '--vocab', default='word_file_x86', help='Duong dan den vocab')
+    parser.add_argument('-t', '--transformer', default='transformer.npy', help='Duong dan den LSH transformer')
+    parser.add_argument('-l', '--loop', default=1, help='So lan loop cho WL hash', type=int)
     args = parser.parse_args()
     setup(args.vocab, args.transformer)
 

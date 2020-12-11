@@ -53,10 +53,10 @@ def pca(folder, vocab, num_blks, num_bits, min_size=5):
 
 def main():
     parser = argparse.ArgumentParser(description="""Tao transformer cho LSH""")
-    parser.add_argument('--vocab', help='Duong dan den vocab file', required=True)
-    parser.add_argument('--bit', type=int, help='So luong bit trong (sub)label', required=True)
+    parser.add_argument('-v', '--vocab', help='Duong dan den vocab file', required=True)
+    parser.add_argument('-b', '--bit', type=int, help='So luong bit trong (sub)label', required=True)
     parser.add_argument('--pca', default=None, help='PCA folder')
-    parser.add_argument('--file_name', default='transformer.npy', help='Ten file de save')
+    parser.add_argument('-n', '--file_name', default='transformer.npy', help='Ten file de save')
     parser.add_argument('--sub', type=int, default=1, help='So luong sublabels')
     parser.add_argument('--pca_blks', type=int, default=2000, help='So luong block dung de tao PCA')
     args = parser.parse_args()
