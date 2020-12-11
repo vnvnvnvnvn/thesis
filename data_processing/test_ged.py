@@ -1,23 +1,24 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
+import argparse
 from ged import *
+from ga_ged import ga
 import networkx as nx
 import sys
 import os
 import matplotlib.pyplot as plt
-from calculate_wl import bag_to_vector, list_to_bag, random_hash, load_lut, load_transformer
+from calculate_wl import bag_to_vector, list_to_bag, random_hash, setup
 import time
 import pickle
-from top10 import mean_ap
-from concurrent.futures import ProcessPoolExecutor
+from top10 import mean_ap, top_distance
 from functools import partial
 
-def test_graph(g1, g2):
+
+def test_graph_pair(fn, g1, g2):
     start = time.clock()
-    cm = node_cost_matrix(g1, g2)
+    d = fn(g1, g2)
     end = time.clock()
-    ged(g1, g2, cm)
-    print((end-start) * 10000)
+    return d, end-start
 
 def process_graph(g):
     nx.set_edge_attributes(g, values = 1, name = 'weight')
@@ -35,11 +36,11 @@ def process_graph(g):
         node[1]['idx'] = idx
     return g
 
-def test_run(folder):
+def test_run(fn, folder, min_node=5, max_node=10):
     file_list = [os.path.join(folder, x) for x in os.listdir(folder)]
     for f in file_list:
         g = nx.read_gpickle(f)
-        if len(g.nodes()) > 5 and len(g.nodes()) < 10:
+        if len(g.nodes()) > min_node and len(g.nodes()) < max_node:
             name = f
             break
     print(name)
@@ -49,19 +50,16 @@ def test_run(folder):
 
     g1 = process_graph(g1)
     g2 = process_graph(g2)
-    # nx.draw_networkx(g1)
-    # plt.show()
-    # nx.draw_networkx(g2)
-    # plt.show()
     print(nx.get_node_attributes(g1, 'idx'))
     print(nx.get_node_attributes(g2, 'idx'))
     print(g1.edges(data=True))
     print(g2.edges(data=True))
-    test_graph(g1, g2)
+    dist, t = test_graph_pair(fn, g1, g2)
+    print(dist)
+    print(t)
 
-def generate_data(folder, saved_dir):
-    load_lut("word_file_x86")
-    load_transformer("transformer.npy")
+def generate_data(folder, saved_dir, vocab_file, transformer_file):
+    setup(vocab_file, transformer_file)
     for f in os.listdir(folder):
         path = os.path.join(folder, f)
         g = nx.read_gpickle(path)
@@ -69,31 +67,18 @@ def generate_data(folder, saved_dir):
         name = os.path.join(saved_dir, f)
         nx.write_gpickle(g, name)
 
-def calculate_ged_distance(g1, item):
-    name, g2 = item
+
+def ged_distance(g1, g2):
     cm = node_cost_matrix(g1, g2)
     distance = ged(g1, g2, cm)[0]
-    return (name, distance)
+    return distance
 
-def top_distance_ged(database, name, topk=10):
-    distance_list = []
-    with ProcessPoolExecutor(10) as ex:
-        distance_list.append(ex.map(partial(calculate_ged_distance, database[name]), list(database.items())))
-    distance_data = {}
-    for dl in distance_list:
-        for d in dl:
-            distance_data[d[0]] = d[1]
-    closest = sorted(distance_data.items(), key=lambda x: x[1])
-    start_idx = 0
-    for i in range(len(closest)):
-        if closest[i][1] < 1.0:
-            start_idx = i - 1
-            break
-    if start_idx < 0:
-        start_idx = 0
-    return closest[:start_idx+topk]
+def ged_ga_distance(g1, g2):
+    distance, _, _ = ga(g1, g2)
+    return distance
 
-def run_misa(database, test_num=100):
+
+def run_misa(f, database, ged_folder, test_num=100, neighbors=10):
     ap_list = []
     time_list = []
     result_list = {}
@@ -102,13 +87,12 @@ def run_misa(database, test_num=100):
     name_list = data.keys()
     processed_graph = {}
     for name in list(name_list)[:100]:
-        processed_graph[name] = nx.read_gpickle(os.path.join("ged_x86_misa", name))
-    print("Finished loading")
+        processed_graph[name] = nx.read_gpickle(os.path.join(ged_folder, name))
+
     for name in list(name_list)[:test_num]:
-        print("Processing " + name + "...")
         start = time.clock()
-        closest_k = top_distance_ged(processed_graph, name)
-        cur_map = mean_ap(closest_k, name, name_list)
+        closest_k = top_distance(f, processed_graph, processed_graph[name], neighbors, False)
+        cur_map = mean_ap(name_list, closest_k, name)
         if cur_map is None:
             continue
         time_list.append(time.clock() - start)
@@ -116,18 +100,37 @@ def run_misa(database, test_num=100):
         ap_list.append(cur_map)
 
     ma = np.mean(ap_list)
-    var_ap = np.var(ap_list)
     mean_time = np.mean(time_list)
     var_time = np.var(time_list)
-    print(str(ma) + " " +
-          str(mean_time) + " " +
-          str(var_time))
-    print(len(np.where(np.asarray(ap_list) < 0.01)[0]))
-    return result_list
+    no_answer = len(np.where(np.asarray(ap_list) < 0.01)[0])
+    return ma, no_answer, mean_time, var_time
+
 
 def main():
-    res = run_misa(sys.argv[1], 20)
-    print(res)
+    parser = argparse.ArgumentParser(description="""Chay thu task retrieval su dung GED""")
+    parser.add_argument('-d', '--database', help='Database da xay dung tu truoc')
+    parser.add_argument('-q', '--query', type=int, default=20, help='So queries')
+    parser.add_argument('--number_of_neighbors', default=10, type=int, help='So nearest neighbors duoc vote')
+    parser.add_argument('-f', '--folder', help='Folder chua file simplified graph')
+    parser.add_argument('-g', '--ged_folder', help='Folder chua file graph da chuyen ve dang dung duoc cho GED')
+    parser.add_argument('--vocab', default='word_file_x86', help='Duong dan den vocab')
+    parser.add_argument('--transformer', default='transformer.npy', help='Duong dan den LSH transformer')
+    parser.add_argument('--ga', action='store_true', help='Su dung GA')
+    parser.add_argument('--test', action='store_true', help='Chay test run voi mot cap graph nho')
+    args = parser.parse_args()
+
+    fn = ged_distance
+    if args.ga:
+        fn = ged_ga_distance
+
+    if args.folder:
+        generate_data(args.folder, args.ged_folder, args.vocab, args.transformer)
+    if args.database:
+        res = run_misa(fn, args.database, args.ged_folder, args.query, args.number_of_neighbors)
+        print(res)
+    if args.test:
+        test_run(fn, args.folder)
+
 
 if __name__=='__main__':
     main()

@@ -1,5 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
+import argparse
 from ged import *
 import networkx as nx
 import sys
@@ -31,7 +32,7 @@ class Solution():
         s = Solution(cost_matrix, self.g1, self.g2)
         return s
 
-def ga(g1, g2, iterations=10, mutation_prob=0.3):
+def ga(g1, g2, iterations=10, mutation_prob=0.3, min_mutation=6, max_mutation=30):
     orig_cm = node_cost_matrix(g1, g2)
     orig_sol = Solution(orig_cm, g1, g2)
     initial_dist = orig_sol.solve()
@@ -41,8 +42,8 @@ def ga(g1, g2, iterations=10, mutation_prob=0.3):
         s = Solution(orig_cm, g1, g2)
         s.cost_matrix[r][c] = INF
         initial[s] = s.solve()
-    full = max(len(g1) + len(g2), 6)
-    full = min(full, 30)
+    full = max(len(g1) + len(g2), num_mutation)
+    full = min(full, max_mutation)
     best_so_far = (orig_sol, initial_dist)
     for i in range(iterations):
         population = sorted(initial.items(), key=lambda x: x[1])[:full // 3]
@@ -71,52 +72,36 @@ def ga(g1, g2, iterations=10, mutation_prob=0.3):
         best_so_far = answer[0]
     return best_so_far[1], orig_sol.estimate, orig_sol.dist
 
-def estimated_vs_real(folder):
-    file_list = [os.path.join(folder, x) for x in os.listdir(folder)][:100]
+def estimated_vs_real(folder, number_of_files=100, plot_name=''):
+    file_list = [os.path.join(folder, x) for x in os.listdir(folder)][:number_of_files]
     database = []
     for f in file_list:
         database.append(nx.read_gpickle(f))
     real = []
     estimated = []
     orig = []
-    count = 0
     for i in range(len(file_list)):
         for j in range(i+1, len(file_list)):
-            count += 1
-            if count % 50 == 0:
-                print("Done " + str(count))
-            # cm = node_cost_matrix(database[i], database[j])
-            # dist, est = ged(database[i], database[j], cm)
             dist, est, orig_cost = ga(database[i], database[j], 7)
             real.append(dist)
             estimated.append(est)
             orig.append(orig_cost)
-    m = max(real)
-    n = max(estimated)
-    mn = max(m, n)
+    mn = max(real+estimated)
     plt.xlim(0, mn)
     plt.ylim(0, mn)
     plt.gca().set_aspect('equal', adjustable='box')
     plt.scatter(real, orig, s=1)
-    plt.show()
+    plt.savefig(plot_name+'.png')
     r = spearmanr(real, orig)
-    print(r)
+    return r
 
 def main():
-    estimated_vs_real(sys.argv[1])
-    # folder = sys.argv[1]
-    # file_list = [os.path.join(folder, x) for x in os.listdir(folder)]
-    # for f in file_list:
-    #     g = nx.read_gpickle(f)
-    #     if len(g.nodes()) > 5 and len(g.nodes()) < 10:
-    #         name = f
-    #         break
-    # print(name)
-    # g1 = nx.read_gpickle(name)
-    # dif_end = (int(f[-1]) + 1) % 4
-    # g2 = nx.read_gpickle(name[:-1]+str(dif_end))
-
-    # ga(g1, g2)
+    parser = argparse.ArgumentParser(description="""So sanh khoang cach GED khi su dung va khi khong su dung GA""")
+    parser.add_argument('--folder', help='Duong dan den folder can xu li')
+    parser.add_argument('--plot', default='estimated_vs_real', help='Ten cua plot ket qua')
+    parser.add_argument('-n', '--number_of_files', default=100, type=int, help='So luong file se co trong database')
+    args = parser.parse_args()
+    estimated_vs_real(args.folder, args.number_of_files, args.plot)
 
 if __name__=='__main__':
     main()

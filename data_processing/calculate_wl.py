@@ -196,7 +196,7 @@ def main():
     parser.add_argument('--file', action='append', help='Cac file can xu ly')
     parser.add_argument('--vocab', default='word_file_x86', help='Duong dan den vocab')
     parser.add_argument('--transformer', default='transformer.npy', help='Duong dan den LSH transformer')
-    parser.add_argument('--loop', default=1, help='So lan loop cho WL hash')
+    parser.add_argument('--loop', default=1, help='So lan loop cho WL hash', type=int)
     args = parser.parse_args()
     setup(args.vocab, args.transformer)
 
@@ -209,7 +209,7 @@ def main():
         with open(args.database, 'wb') as handle:
             pkl.dump(db, handle)
     if args.file:
-        for name in file:
+        for name in args.file:
             g = nx.read_gpickle(name)
             wl = calculate_wl(g, args.loop)
             print(wl)

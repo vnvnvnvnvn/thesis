@@ -115,7 +115,7 @@ def generate_graph(json_folder, saved_dir, simp_dir, data):
         nx.write_gpickle(g, simp_saved_path)
     return simp_saved_path
 
-def generate_graph_nonrec(saved_subdir, saved_dir, file_name):
+def generate_graph_nonrec(saved_dir, saved_subdir, file_name):
     if not os.path.isdir(saved_subdir):
         os.makedirs(saved_subdir)
     if not os.path.isdir(saved_dir):
@@ -147,7 +147,7 @@ def process_all_virus_data(json_folder, saved_type, virus_saved_dir, simp_dir):
 def process_benign_data(json_folder, benign_saved_dir, saved_subdir):
     todo = [os.path.join(json_folder, x) for x in os.listdir(json_folder)]
     with ProcessPoolExecutor(10) as ex:
-        ex.map(partial(generate_graph_nonrec, saved_subdir, benign_saved_dir), todo)
+        ex.map(partial(generate_graph_nonrec, benign_saved_dir, saved_subdir), todo)
 
 def generate_vocab(folder, vocab_path):
     vocab = defaultdict(lambda:0)
