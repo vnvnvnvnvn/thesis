@@ -175,10 +175,10 @@ def generate_file_list_nested(folder, benign=True):
             continue
         subdir_path = os.path.join(folder, subdir)
         files += [os.path.join(subdir_path, x) for x in os.listdir(subdir_path)]
+    random.shuffle(files)
     if benign:
         benign_files = [os.path.join(folder, "Benign", x) for x in os.listdir(os.path.join(folder, "Benign"))]
-        files += benign_files
-    random.shuffle(files)
+        files = benign_files + files
     return files
 
 def setup(vocab_file, transformer_file):
