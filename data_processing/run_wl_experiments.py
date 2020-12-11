@@ -42,7 +42,7 @@ def generate_detect_data(item_list, number):
 
 
 def process_retrieve_data(f, data, test_data, ged=None, neighbors=10):
-    name_list = set(data.keys())
+    name_list = [os.path.basename(x) for x in set(data.keys())]
     time_list = []
     result_list = {}
 

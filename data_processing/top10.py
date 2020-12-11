@@ -38,7 +38,7 @@ def top_distance(f, db, item, topk=10, reverse=True):
     return closest[:start_idx+topk]
 
 def mean_ap(name_list, top, name):
-    # name = os.path.basename(name)
+    name = os.path.basename(name)
     relevant_doc = 0
     for i in range(4):
         relevant_name = name[:-1] + str(i)
@@ -115,10 +115,11 @@ def main():
         'idf': tf_distance
     }
 
+    name_list = [os.path.basename(x) for x in db.keys()]
     task_lookup = {
         'classify': classify_malware_type,
         'detect': classify_malware,
-        'retrieve': partial(mean_ap, db.keys())
+        'retrieve': partial(mean_ap, name_list)
     }
 
     if args.distance_type == 'idf':
