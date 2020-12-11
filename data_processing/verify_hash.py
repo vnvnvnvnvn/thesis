@@ -25,7 +25,6 @@ def generate_block(dbname, num_blks, folder, nested, min_size=3):
             files += [os.path.join(subdir_path, x) for x in os.listdir(subdir_path)]
     else:
         files = [os.path.join(folder, x) for x in os.listdir(folder)]
-
     random.shuffle(files)
     for name in islice(files, num_blks):
         graph = nx.read_gpickle(name)
@@ -59,7 +58,6 @@ def hash_distance(fn, sim_file, sensitivity=0.9):
     hashed_blks = []
     with open(sim_file, 'rb') as f:
         vectorized_blks = pkl.load(f)
-
     vectorized_blks = np.squeeze(vectorized_blks)
     def normalise(A):
         lengths = ((A**2).sum(axis=1, keepdims=True)**.5)
@@ -71,9 +69,9 @@ def hash_distance(fn, sim_file, sensitivity=0.9):
     hash_convert_time = 0
     normed_test = normalise(np.asarray(vectorized_blks))
     for b in normed_test:
-        start = time.clock()
+        start = time.time()
         h = random_hash(np.expand_dims(b, axis=0))
-        end = time.clock()
+        end = time.time()
         hash_convert_time += (end - start)
         hashed_blks.append(copy.deepcopy(h))
 
@@ -90,11 +88,11 @@ def hash_distance(fn, sim_file, sensitivity=0.9):
 
     for i in range(len(normed_test)):
         for j in range(i + 1, len(normed_test)):
-            start_cosine = time.clock()
+            start_cosine = time.time()
             orig_dist = cosine_sim(normed_test[i], normed_test[j])
-            end_cosine = time.clock()
+            end_cosine = time.time()
             hash_dist = fn(hashed_blks[i], hashed_blks[j])
-            end_hash = time.clock()
+            end_hash = time.time()
             cosine_time += (end_cosine - start_cosine)
             hash_time += (end_hash - end_cosine)
             total_pairs += 1
@@ -120,7 +118,7 @@ def main():
     parser.add_argument('--folder', help='Duong dan den folder can xu li')
     parser.add_argument('--database', help='Ten cua database ket qua', required=True)
     parser.add_argument('-n', '--number_of_blocks', default=2000, type=int, help='So luong blocks se co trong database')
-    parser.add_argument('--nested', default=False, type=bool, help='Folder da cho co nested khong')
+    parser.add_argument('--nested', action='store_true', help='Folder da cho co nested khong')
     parser.add_argument('--vocab', default='word_file_x86', help='Duong dan den vocab')
     parser.add_argument('--transformer', default='transformer.npy', help='Duong dan den LSH transformer')
     parser.add_argument('-s', '--sensitivity', default=0.9, type=float, help='Min cosine distance de coi hai nhan la giong nhau')

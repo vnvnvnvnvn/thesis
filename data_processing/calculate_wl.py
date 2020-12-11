@@ -162,7 +162,7 @@ def build_database(file_list, n=12000, loop=1):
     return database
 
 def generate_file_list(folder):
-    files = os.listdir(folder)
+    files = [os.path.join(folder, x) for x in os.listdir(folder)]
     files.sort()
     return files
 

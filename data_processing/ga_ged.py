@@ -42,7 +42,7 @@ def ga(g1, g2, iterations=10, mutation_prob=0.3, min_mutation=6, max_mutation=30
         s = Solution(orig_cm, g1, g2)
         s.cost_matrix[r][c] = INF
         initial[s] = s.solve()
-    full = max(len(g1) + len(g2), num_mutation)
+    full = max(len(g1) + len(g2), min_mutation)
     full = min(full, max_mutation)
     best_so_far = (orig_sol, initial_dist)
     for i in range(iterations):
@@ -91,6 +91,8 @@ def estimated_vs_real(folder, number_of_files=100, plot_name=''):
     plt.ylim(0, mn)
     plt.gca().set_aspect('equal', adjustable='box')
     plt.scatter(real, orig, s=1)
+    plt.xlabel('ga')
+    plt.ylabel('non-ga')
     plt.savefig(plot_name+'.png')
     r = spearmanr(real, orig)
     return r

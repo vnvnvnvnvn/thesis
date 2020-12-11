@@ -20,7 +20,6 @@ def random_projection(vocab, s1, s2):
 
 def pca(folder, vocab, num_blks, num_bits, min_size=5):
     files = [os.path.join(folder, x) for x in os.listdir(folder)]
-    random.seed(42)
     random.shuffle(files)
     record = []
     for i in range(len(files) - num_blks, len(files)):

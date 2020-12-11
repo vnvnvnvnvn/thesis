@@ -38,7 +38,7 @@ def top_distance(f, db, item, topk=10, reverse=True):
     return closest[:start_idx+topk]
 
 def mean_ap(name_list, top, name):
-    name = os.path.basename(name)
+    # name = os.path.basename(name)
     relevant_doc = 0
     for i in range(4):
         relevant_name = name[:-1] + str(i)
@@ -64,7 +64,7 @@ def classify_malware(name_list, name):
         if name == n:
             continue
         c = n.split("/")
-        if c[1] == "Benign":
+        if c[-2] == "Benign":
             counter["not_malware"] += 1
         else:
             counter["malware"] += 1
@@ -79,7 +79,7 @@ def classify_malware_type(name_list, name):
         if name == n:
             continue
         c = n.split("/")
-        counter[c[1]] += 1
+        counter[c[-2]] += 1
     s = sorted(counter.items(), key=lambda x: x[1], reverse=True)
     if s[0][1] <= len(name_list) // 5:
         return 'unsure'
