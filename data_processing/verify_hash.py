@@ -61,19 +61,18 @@ def hash_distance(fn, sim_file, sensitivity=0.9):
         vectorized_blks = pkl.load(f)
 
     vectorized_blks = np.squeeze(vectorized_blks)
-
     def normalise(A):
         lengths = ((A**2).sum(axis=1, keepdims=True)**.5)
-        return A/lengths
+        return A/(lengths + 1e-10)
     def cosine_sim(p, q):
-        return np.dot(p, q)
+        return np.dot(p, q.T)
 
 
     hash_convert_time = 0
     normed_test = normalise(np.asarray(vectorized_blks))
     for b in normed_test:
         start = time.clock()
-        h = random_hash(b)
+        h = random_hash(np.expand_dims(b, axis=0))
         end = time.clock()
         hash_convert_time += (end - start)
         hashed_blks.append(copy.deepcopy(h))
@@ -124,9 +123,10 @@ def main():
     parser.add_argument('--nested', default=False, type=bool, help='Folder da cho co nested khong')
     parser.add_argument('--vocab', default='word_file_x86', help='Duong dan den vocab')
     parser.add_argument('--transformer', default='transformer.npy', help='Duong dan den LSH transformer')
-    parser.add_argument('--sensitivity', default=0.9, type=float, help='Min cosine distance de coi hai nhan la giong nhau')
+    parser.add_argument('-s', '--sensitivity', default=0.9, type=float, help='Min cosine distance de coi hai nhan la giong nhau')
     parser.add_argument('--half', default=True, type=bool, help='Hai nhan tinh la giong nhau neu mot nua so sublabel giong nhau (True) hay mot nhan con giong nhau (False)')
     args = parser.parse_args()
+    setup(args.vocab, args.transformer)
     if args.folder:
         generate_block(args.database, args.number_of_blocks, args.folder, args.nested)
     else:
@@ -134,7 +134,6 @@ def main():
             fn = hashing_sim_half
         else:
             fn = hashing_sim_or
-        setup(args.vocab, args.transformer)
         hash_distance(fn, args.database, args.sensitivity)
 
 

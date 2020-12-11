@@ -9,6 +9,7 @@ import networkx as nx
 from collections import defaultdict
 from calculate_wl import name_to_index, bag_to_vector_no_lut, list_to_bag
 
+
 def random_projection(vocab, s1, s2):
     wf = open(vocab)
     lut = name_to_index(wf.readlines())
@@ -51,18 +52,21 @@ def pca(folder, vocab, num_blks, num_bits, min_size=5):
     proj = np.expand_dims(proj, axis=2)
     return proj
 
-if __name__=='__main__':
+def main():
     parser = argparse.ArgumentParser(description="""Tao transformer cho LSH""")
-    parser.add_argument('--pca', default=None, help='PCA folder')
-    parser.add_argument('--name', default='transformer.npy', help='Ten file de save')
     parser.add_argument('--vocab', help='Duong dan den vocab file', required=True)
     parser.add_argument('--bit', type=int, help='So luong bit trong (sub)label', required=True)
+    parser.add_argument('--pca', default=None, help='PCA folder')
+    parser.add_argument('--file_name', default='transformer.npy', help='Ten file de save')
     parser.add_argument('--sub', type=int, default=1, help='So luong sublabels')
     parser.add_argument('--pca_blks', type=int, default=2000, help='So luong block dung de tao PCA')
     args = parser.parse_args()
-
     if args.pca:
         proj = pca(args.pca, args.vocab, args.bit, args.pca_blks)
     else:
         proj = random_projection(args.vocab, args.bit, args.sub)
-    np.save(args.name, proj)
+    np.save(args.file_name, proj)
+
+
+if __name__=='__main__':
+    main()
