@@ -39,6 +39,7 @@ def process_graph(g):
 def test_run(fn, folder, min_node=15, max_node=20):
     file_list = [os.path.join(folder, x) for x in os.listdir(folder)]
     cnt = 2
+    name = []
     for f in file_list:
         g = nx.read_gpickle(f)
         l = len(g.nodes(data=True))
