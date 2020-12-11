@@ -90,12 +90,12 @@ def run_misa(f, database, ged_folder, test_num=100, neighbors=10):
     result_list = {}
     with open(database, 'rb') as handle:
         data = pickle.load(handle)
-    name_list = data.keys()
+    name_list = [os.path.basename(x) for x in data.keys()]
     processed_graph = {}
-    for name in list(name_list)[:100]:
+    for name in name_list[:1000]:
         processed_graph[name] = nx.read_gpickle(os.path.join(ged_folder, os.path.basename(name)))
 
-    for name in list(name_list)[:test_num]:
+    for name in name_list[:test_num]:
         start_time = time.time()
         closest_k = top_distance(f, processed_graph, processed_graph[name], neighbors, False)
         cur_map = mean_ap(name_list, closest_k, name)

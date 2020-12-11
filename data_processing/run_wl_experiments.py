@@ -153,7 +153,6 @@ def classify_experiment(plot, num, database_list, save_file, expr="IOU", neighbo
             df, perc = process_classification_result(result)
             print(perc)
             plot_confusion_matrix(df, expr)
-            result_data.append(str(perc)+"\n")
     with open(save_file, 'a+') as f:
         f.write("\n".join(result_data))
 
