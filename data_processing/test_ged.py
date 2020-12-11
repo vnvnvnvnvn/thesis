@@ -117,7 +117,32 @@ def run_misa(f, database, ged_folder, test_num=100, neighbors=10):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="""Chay thu task retrieval su dung GED""")
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description='''  Chay thu task retrieval su dung GED
+  Ba cong viec chuong trinh nay co the dam nhiem:
+    1. Kiem tra la GED co hoat dong:
+        ./test_ged.py --test -f example_simplified_MISA -v word_file_x86 -t x86_transformer.npy
+            se chon ra hai files bat ki trong example_simplified_MISA, su dung word_file_x86 va
+            x86_transformer.npy de chay LSH (assume la trong folder nay co cac simplified graphs
+            cua x86) va tinh GED giua chung
+
+        ./test_ged.py --test --ga -f example_simplified_MISA -v word_file_x86 -t x86_transformer.npy
+            y nhu tren nhung chay GA sau do nham cai thien GED
+
+    2. Tao ra graph data GED co the su dung:
+        ./test_ged.py -f simp_graphs/x86 -g ged_misa_x86 -d wl_data/misa_db_x86_32_1.pkl -v word_file_x86 -t x86_transformer
+            se doc ten cac file trong wl_data/misa_db_x86_32_1.pkl, xu ly chung (cac file nay nam trong folder
+            simp_graphs/x86) va save vao ged_misa_x86
+        ./test_ged,py -f simp_graphs/arm -g ged_misa_arm -d wl_data/misa_db_32_1.pkl -v word_file_arm -t arm_transformer -n 1000
+            cung tuong tu nhu tren nhung chi viet 1000 files vao ged_misa_arm
+
+    3. Chay task retrieval dung GED:
+        ./test_ged.py -d wl_data/misa_db_x86_32_1.pkl -g ged_misa_x86 -q 5 -n 10
+            Thuc hien 5 queries voi cac files co trong ged_misa_x86, doc danh sach tu wl_data/misa_db_x86_32_1.pkl
+        ./test_ged.py -d wl_data/misa_db_x86_32_1.pkl -g ged_misa_x86 -q 20 -n 10 --ga
+            Cung tuong tu nhu tren, nhung la 20 queries va su dung GA
+''')
     parser.add_argument('-d', '--database', help='Database da xay dung tu truoc')
     parser.add_argument('-q', '--query', type=int, default=20, help='So queries')
     parser.add_argument('-n', '--number_of_neighbors', default=10, type=int, help='So nearest neighbors duoc vote')
