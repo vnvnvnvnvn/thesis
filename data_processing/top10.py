@@ -117,7 +117,7 @@ def main():
 
     task_lookup = {
         'classify': classify_malware_type,
-        'detect': classify_malwarem,
+        'detect': classify_malware,
         'retrieve': partial(mean_ap, db.keys())
     }
 

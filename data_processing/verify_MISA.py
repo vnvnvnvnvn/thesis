@@ -106,6 +106,11 @@ def main():
     if args.file:
         example_saved_dir = os.path.join(args.root, args.example_folder)
         example_simp_dir = os.path.join(args.root, args.example_simplified)
+        if os.path.isdir(example_saved_dir):
+            os.makedirs(example_saved_dir)
+        if os.path.isdir(example_simp_dir):
+            os.makedirs(example_simp_dir)
+
         simp = proc.InstructionSimplifier()
         for name in args.file:
             fns = rmisa.read_file(name, args.arch)
