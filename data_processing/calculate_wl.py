@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 from collections import defaultdict
 import sys
 import numpy as np
@@ -138,6 +139,14 @@ def iou_distance(w1, w2):
     scale = len(set(w1.keys()).union(set(w2.keys()))) * 1.0
     return dot / scale
 
+def tf_distance(idf, w1, w2):
+    wc = sum(list(w1.values()))
+    for k, v in w1:
+        if k not in idf.keys():
+            continue
+        w1[k] = idf[k] * v * 1.0 / wc
+    return label_distance(w1, w2)
+
 def build_database(file_list, n=12000):
     database = {}
     cnt = 0
@@ -148,8 +157,6 @@ def build_database(file_list, n=12000):
             continue
         cnt += 1
         database[file_list[i]] = w
-        if i % 500 == 0:
-            print("Finished with file " + str(i))
         if cnt >= n:
             break
     return database
@@ -159,7 +166,7 @@ def generate_file_list(folder):
     files.sort()
     return files
 
-def generate_file_list_nested(folder):
+def generate_file_list_nested(folder, benign=True):
     import random
     random.seed(42)
     files = []
@@ -168,10 +175,11 @@ def generate_file_list_nested(folder):
             continue
         subdir_path = os.path.join(folder, subdir)
         files += [os.path.join(subdir_path, x) for x in os.listdir(subdir_path)]
+    if benign:
+        benign_files = [os.path.join(folder, "Benign", x) for x in os.listdir(os.path.join(folder, "Benign"))]
+        files += benign_files
     random.shuffle(files)
-    benign_files = [os.path.join(folder, "Benign", x) for x in os.listdir(os.path.join(folder, "Benign"))]
-    benign_files += files
-    return benign_files
+    return files
 
 def setup(vocab_file, transformer_file):
     global transformer, lut
@@ -179,35 +187,32 @@ def setup(vocab_file, transformer_file):
     transformer = load_transformer(transformer_file)
 
 def main():
-    if len(sys.argv) < 2:
-        print("USAGE:\n\tcalculate_wl.py <folder> [database_name] [vocab_file] [transformer_file]\n\tcalculate_wl.py <file_name>")
-        exit()
+    parser = argparse.ArgumentParser(description="""Tinh WL hash tu simplified graph, save vao database neu xu ly ca folder. Cung co the duoc su dung de in thu WL hash cua mot so files don le""")
+    parser.add_argument('--folder', help='Duong dan den folder can xu li')
+    parser.add_argument('--database', help='Ten cua database ket qua')
+    parser.add_argument('-n', '--number_of_files', default=12000, type=int, help='So luong file se co trong database')
+    parser.add_argument('--benign', action='store_true', help='Them cac file lanh vao database')
+    parser.add_argument('--nested', action='store_true', help='Folder da cho co nested khong')
+    parser.add_argument('--file', action='append', help='Cac file can xu ly')
+    parser.add_argument('--vocab', default='word_file_x86', help='Duong dan den vocab')
+    parser.add_argument('--transformer', default='transformer.npy', help='Duong dan den LSH transformer')
+    args = parser.parse_args()
+    setup(args.vocab, args.transformer)
 
-    vocab_file = "word_file_x86"
-    transformer_file = "transformer.npy"
-    db_name = "wl_db.pkl"
-    if os.path.isdir(sys.argv[1]):
-        if len(sys.argv) > 2:
-            db_name = sys.argv[2]
-        if len(sys.argv) > 3:
-            vocab_file = sys.argv[3]
-        if len(sys.argv) > 4:
-            transformer_file = sys.argv[4]
-        setup(vocab_file, transformer_file)
-        file_list = generate_file_list_nested(sys.argv[1])
-        # file_list = generate_file_list(sys.argv[1])
-        db = build_database(file_list)
-        with open(db_name, 'wb') as handle:
+    if args.folder and args.database:
+        if args.nested:
+            file_list = generate_file_list_nested(args.folder, args.benign)
+        else:
+            file_list = generate_file_list(args.folder)
+        db = build_database(file_list, args.number_of_files)
+        with open(args.database, 'wb') as handle:
             pkl.dump(db, handle)
-    else:
-        if len(sys.argv) > 2:
-            vocab_file = sys.argv[2]
-        if len(sys.argv) > 3:
-            transformer_file = sys.argv[3]
-        setup(vocab_file, transformer_file)
-        g = nx.read_gpickle(sys.argv[1])
-        wl = calculate_wl(g)
-        print(wl)
+    if args.file:
+        for name in file:
+            g = nx.read_gpickle(name)
+            wl = calculate_wl(g)
+            print(wl)
+
 
 if __name__=='__main__':
     main()

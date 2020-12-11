@@ -4,23 +4,28 @@ import os
 import r2pipe as r2
 import sys
 from multiprocessing import Pool
+from functools import partial
+import pickle
 
 def create_json(orig_path, root_json="benign_json_test", extension=""):
-    #name = orig_path.replace("/", "_")
-    name = os.path.basename(orig_path)
+    name = orig_path.replace("/", "_")
+    #name = os.path.basename(orig_path)
     json_path = os.path.join(root_json, name) + extension
     t = r2.open(orig_path, ['-2'])
-    jcontent = t.cmd('aaa;s main;agfj')
+    jcontent = t.cmd('aaa;agfj @@f')
     t.quit()
     json_file = open(json_path, 'w')
     json_file.write(jcontent)
     json_file.close()
 
-def create_json_virus(name, root_virus="malware/data/RAW_final_dataset", root_json="malware/data/jsons"):
-    orig_path = os.path.join(root_virus, name)
+def create_json_virus(orig_folder, name, root_json="../new_jsons"):
+    orig_path = os.path.join(orig_folder, name)
+    root_json = os.path.join(orig_folder, root_json)
     json_path = os.path.join(root_json, name)
+    if os.path.isfile(json_path):
+        return
     t = r2.open(orig_path, ['-2'])
-    jcontent = t.cmd('aaa;agfj')
+    jcontent = t.cmd('aaa;agfj @@f')
     t.quit()
     json_file = open(json_path, 'w')
     json_file.write(jcontent)
@@ -40,9 +45,11 @@ def process_list(name):
         multi(create_json, files, 5)
 
 def process_folder(folder):
-    for d in os.listdir(folder):
-        todo = [os.path.join(d, x) for x in os.listdir(os.path.join(folder, d))]
-        multi(create_json_virus, todo, 5)
+    handle = open('reporting_type.pkl', 'rb')
+    data_arch = pickle.load(handle)
+    handle.close()
+    todo = [d for (d, arch) in data_arch.items() if arch == 'x86']
+    multi(partial(create_json_virus, folder), todo, 5)
 
 if __name__=='__main__':
     if len(sys.argv) < 2:

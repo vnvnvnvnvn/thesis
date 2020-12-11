@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
+import argparse
 import pickle as pkl
-from calculate_wl import label_distance, iou_distance, calculate_wl, setup
+from calculate_wl import label_distance, iou_distance, tf_distance, calculate_wl, setup
 import time
 import sys
 from functools import partial
@@ -16,14 +17,14 @@ def calculate_distance(f, comp, item):
     distance = f(comp, v)
     return (k, distance)
 
-def top_distance(f, db, item, topk=10):
+def top_distance(f, db, item, topk=10, reverse=True):
     pool = Pool(processes=8, maxtasksperchild=10)
     distance_list = pool.map(partial(calculate_distance, f, item), db.items())
 
     distance_data = {}
     for dl in distance_list:
         distance_data[dl[0]] = dl[1]
-    closest = sorted(distance_data.items(), key=lambda x: x[1], reverse=True)
+    closest = sorted(distance_data.items(), key=lambda x: x[1], reverse=reverse)
     start_idx = 0
     for i in range(len(closest)):
         if closest[i][1] < 1.0:
@@ -36,23 +37,14 @@ def top_distance(f, db, item, topk=10):
     del pool
     return closest[:start_idx+topk]
 
-def isin(top, name):
-    for idx, elem in enumerate(top):
-        k, v = elem
-        if k == name:
-            continue
-        if k[:-2] == name[:-2] and v > 0.01:
-            return idx
-    return None
-
-def mean_ap(top, name, name_list):
+def mean_ap(name_list, top, name):
     name = os.path.basename(name)
     relevant_doc = 0
     for i in range(4):
         relevant_name = name[:-1] + str(i)
         if relevant_name in name_list:
             relevant_doc += 1
-    if relevant_doc <= 1:
+    if relevant_doc <= 2:
         return None
     correct_so_far = 0
     num_so_far = 0
@@ -77,7 +69,7 @@ def classify_malware(name_list, name):
         else:
             counter["malware"] += 1
     s = sorted(counter.items(), key=lambda x: x[1], reverse=True)
-    if s[0][1] == len(name_list) // 2:
+    if s[0][1] <= len(name_list) // 2:
         return 'unsure'
     return s[0][0]
 
@@ -89,40 +81,64 @@ def classify_malware_type(name_list, name):
         c = n.split("/")
         counter[c[1]] += 1
     s = sorted(counter.items(), key=lambda x: x[1], reverse=True)
-    if s[0][1] == len(name_list) // 5:
+    if s[0][1] <= len(name_list) // 5:
         return 'unsure'
     return s[0][0]
 
 def main():
-    if len(sys.argv) < 3:
-        print("USAGE:\n\ttop10.py <database_name> <folder_name> [vocab_file] [transformer_file]")
-        exit()
-    vocab_file = "word_file_x86"
-    transformer_file = "transformer.npy"
-    if len(sys.argv) > 3:
-        vocab_file = sys.argv[3]
-    if len(sys.argv) > 4:
-        transformer_file = sys.argv[4]
-    setup(vocab_file, transformer_file)
+    parser = argparse.ArgumentParser(description="""Chay thu mot so task (classification, detection, retrieval) cho mot file""")
+    parser.add_argument('-t', '--task', choices=['detect', 'classify', 'retrieve'], default='detect', help='Task muon thu')
+    parser.add_argument('-d', '--database', help='Database da xay dung tu truoc', required=True)
+    parser.add_argument('--number_of_neighbors', default=10, type=int, help='So nearest neighbors duoc vote')
+    parser.add_argument('--distance_type', choices=['iou', 'cosine', 'idf'], default='iou', help='Phep tinh do tuong dong')
+    parser.add_argument('--idf_database', help='Database IDF tuong ung voi database dung de thu nghiem, chi can thiet neu dung distance_type la idf')
+    parser.add_argument('-f', '--folder', help='Folder chua file simplified graph')
+    parser.add_argument('--file', action='append', help='File can xu ly')
+    parser.add_argument('--arch', choices=['arm', 'x86'], default='x86', help='Architecture')
+    parser.add_argument('--vocab', default='word_file_x86', help='Duong dan den vocab')
+    parser.add_argument('--transformer', default='transformer.npy', help='Duong dan den LSH transformer')
+    args = parser.parse_args()
 
-    db_name = sys.argv[1]
-    classify_folder = sys.argv[2]
-    with open(db_name, 'rb') as handle:
+    setup(args.vocab, args.transformer)
+
+    with open(args.database, 'rb') as handle:
         db = pkl.load(handle)
-    todo = [os.path.join(classify_folder, x) for x in os.listdir(classify_folder)]
-    classify_result = {}
+
+    if args.folder:
+        todo = [os.path.join(args.folder, x) for x in os.listdir(args.folder)]
+    if args.file:
+        todo = args.file
+
+    fn_lookup = {
+        'iou': iou_distance,
+        'cosine': label_distance,
+        'idf': tf_distance
+    }
+
+    task_lookup = {
+        'classify': classify_malware_type,
+        'detect': classify_malwarem,
+        'retrieve': partial(mean_ap, db.keys())
+    }
+
+    if args.distance_type == 'idf':
+        if args.idf_database is None:
+            print("Need IDF database with this distance type")
+            exit(1)
+        with open(args.idf_database, 'rb') as handle:
+            idf_database = pkl.load(handle)
+        fn_lookup['idf'] = partial(tf_distance, idf_database)
+
+    result = {}
     for f in todo:
-        start = time.clock()
         g = nx.read_gpickle(f)
         wl = calculate_wl(g)
-        closest_k = top_distance(iou_distance, db, wl, 10)
-        #print(closest_k)
-        classify_result[f] = mean_ap(closest_k, f, db.keys())
-        #classify_result[f] = classify_malware(closest_k, f)
-        #classify_result[f] = classify_malware_type(closest_k, f)
-    #print(classify_result)
-    for name, score in classify_result.items():
+        closest_k = top_distance(fn_lookup[args.distance_type], db, wl, topk=args.number_of_neighbors)
+        result[f] = task_lookup[args.task](closest_k, f)
+    for name, score in result.items():
         if score is not None:
             print(name + ":" + str(score))
+
+
 if __name__=='__main__':
     main()

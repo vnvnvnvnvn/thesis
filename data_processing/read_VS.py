@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import json
 import networkx as nx
 import sys
@@ -87,18 +88,23 @@ def simplify_graph(saved_dir, name):
         nx.write_gpickle(g, saved_path)
     return saved_path
 
-def generate_graph(json_folder, saved_dir, data):
+def generate_graph(json_folder, saved_dir, simp_dir, data):
     d, arch = data
     t, name = d.split("/")
-    if t not in set(["Adware", "Backdoor", "Trojan", "Virus", "Worm"]):
-        return
+    # if t not in set(["Adware", "Backdoor", "Trojan", "Virus", "Worm"]):
+        # return
     if arch == 'x86':
         g, jmp_pts = json_to_graph(os.path.join(json_folder, d))
         if len(g.nodes()) == 0:
             return
         saved_path = os.path.join(saved_dir, d)
+        saved_folder = os.path.join(saved_dir, t)
+        if not os.path.isdir(saved_folder):
+            os.makedirs(saved_folder)
         nx.write_gpickle(g, saved_path)
-        saved_subdir = os.path.join(os.getcwd(), "simp_vsgraphs", t)
+        saved_subdir = os.path.join(simp_dir, t)
+        if not os.path.isdir(saved_subdir):
+            os.makedirs(saved_subdir)
         for d in g.nodes(data=True):
             if 'data' not in d[1].keys():
                 d[1]['data'] = []
@@ -110,6 +116,10 @@ def generate_graph(json_folder, saved_dir, data):
     return simp_saved_path
 
 def generate_graph_nonrec(saved_subdir, saved_dir, file_name):
+    if not os.path.isdir(saved_subdir):
+        os.makedirs(saved_subdir)
+    if not os.path.isdir(saved_dir):
+        os.makedirs(saved_dir)
     name = os.path.basename(file_name)
     g, jmp_pts = json_to_graph(file_name)
     if len(g.nodes()) == 0:
@@ -126,29 +136,26 @@ def generate_graph_nonrec(saved_subdir, saved_dir, file_name):
     nx.write_gpickle(g, simp_saved_path)
     return simp_saved_path
 
-def process_all_virus_data(json_folder):
-    handle = open('reporting_type.pkl', 'rb')
+def process_all_virus_data(json_folder, saved_type, virus_saved_dir, simp_dir):
+    handle = open(saved_type, 'rb')
     data_arch = pickle.load(handle)
     handle.close()
     print(len(data_arch))
-    virus_saved_dir = os.path.join(os.getcwd(), "vsgraphs", "x86")
-    todo = [os.path.join(json_folder, x) for x in os.listdir(json_folder)]
     with ProcessPoolExecutor(10) as ex:
-        ex.map(partial(generate_graph, json_folder, virus_saved_dir), data_arch.items())
+        ex.map(partial(generate_graph, json_folder, virus_saved_dir, simp_dir), data_arch.items())
 
 def process_benign_data(json_folder, benign_saved_dir, saved_subdir):
     todo = [os.path.join(json_folder, x) for x in os.listdir(json_folder)]
     with ProcessPoolExecutor(10) as ex:
         ex.map(partial(generate_graph_nonrec, saved_subdir, benign_saved_dir), todo)
 
-def generate_vocab(folder):
+def generate_vocab(folder, vocab_path):
     vocab = defaultdict(lambda:0)
     unrecognized = set()
     files = []
     for subdir in os.listdir(folder):
         subdir_path = os.path.join(folder, subdir)
         files += [os.path.join(subdir_path, x) for x in os.listdir(subdir_path)]
-    vocab_path = "vs_word_file"
     for i in range(len(files)):
         g = nx.read_gpickle(files[i])
         for node in g.nodes(data='data'):
@@ -166,19 +173,37 @@ def generate_vocab(folder):
     return vocab_path
 
 def main():
-    if len(sys.argv) < 2:
-        print("USAGE:\n\tread_VS.py <json_folder>\n\tread_VS.py <json_virus_folder> <json_benign_folder>")
-        exit()
-    if len(sys.argv) == 2:
-        benign_saved_dir = os.path.join(os.getcwd(), "example_graphs")
-        saved_subdir = os.path.join(os.getcwd(), "simplified_example")
-        process_benign_data(sys.argv[1], benign_saved_dir, saved_subdir)
-        exit()
-    benign_saved_dir = os.path.join(os.getcwd(), "benign_graphs", "x86")
-    saved_subdir = os.path.join(os.getcwd(), "simp_vsgraphs", "Benign")
-    process_benign_data(sys.argv[2], benign_saved_dir, saved_subdir)
-    process_all_virus_data(sys.argv[1])
-    generate_vocab(os.path.join(os.getcwd(), "simp_vsgraphs"))
+    root_folder = os.getcwd()
+    parser = argparse.ArgumentParser(description="""Chuyen VirusShare json thanh graph""")
+    parser.add_argument('-a', '--all', action='store_true', help='Xu ly toan bo VS folder')
+    parser.add_argument('-f', '--folder', help='Folder chua file virus VS json')
+    parser.add_argument('--simplified_folder', default='simp_vsgraphs', help='Folder de save file simplified')
+    parser.add_argument('--graphs_folder', default='vsgraphs', help='Folder de save file graph')
+    parser.add_argument('-b', '--benign', help='Folder chua file benign json')
+    parser.add_argument('--file', action='append', help='File can xu ly')
+    parser.add_argument('--vocab', const='vs_word_file', action='store_const', help='Tao ra file vocab va dem tu')
+    parser.add_argument('--root', default=root_folder, help='Root folder de save file')
+    parser.add_argument('--example_folder', default='example_graph', help='Folder de save example graph')
+    parser.add_argument('--example_simplified', default='example_simplified', help='Folder de save simplified example graph')
+    parser.add_argument('--saved_type', default='reporting_type.pkl', help='File pickle co chua architecture cua cac file trong VS')
+    args = parser.parse_args()
+
+    if args.all:
+        if args.benign:
+            benign_saved_dir = os.path.join(args.root, args.graphs_folder, "Benign")
+            saved_subdir = os.path.join(args.root, args.simplified_folder, "Benign")
+            process_benign_data(args.benign, benign_saved_dir, saved_subdir)
+        if args.folder:
+            virus_saved_dir = os.path.join(args.root, args.graphs_folder)
+            simp_dir = os.path.join(args.root, args.simplified_folder)
+            process_all_virus_data(args.folder, args.saved_type, virus_saved_dir, simp_dir)
+        if args.vocab:
+            generate_vocab(os.path.join(args.root, args.simplified_folder), args.vocab)
+    if args.file:
+        example_saved_dir = os.path.join(args.root, args.example_folder)
+        example_simp_dir = os.path.join(args.root, args.example_simplified)
+        for name in args.file:
+            generate_graph_nonrec(example_saved_dir, example_simp_dir, name)
 
 if __name__=='__main__':
     main()
