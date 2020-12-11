@@ -38,17 +38,20 @@ def process_graph(g):
 
 def test_run(fn, folder, min_node=15, max_node=20):
     file_list = [os.path.join(folder, x) for x in os.listdir(folder)]
+    cnt = 2
     for f in file_list:
         g = nx.read_gpickle(f)
         l = len(g.nodes(data=True))
-        if  l > min_node and l < max_node:
-            name = f
-            break
+        if l > min_node and l < max_node:
+            name.append(f)
+            cnt -= 1
+            if cnt == 0:
+                break
     print(name)
-    g1 = nx.read_gpickle(name)
-    dif_end = (int(f[-1]) + 1) % 4
-    g2 = nx.read_gpickle(name[:-1]+str(dif_end))
-
+    g1 = nx.read_gpickle(name[0])
+    # dif_end = (int(f[-1]) + 1) % 4
+    # g2 = nx.read_gpickle(name[:-1]+str(dif_end))
+    g2 = nx.read_gpickle(name[1])
     g1 = process_graph(g1)
     g2 = process_graph(g2)
     print(nx.get_node_attributes(g1, 'idx'))
