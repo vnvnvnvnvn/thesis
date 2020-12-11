@@ -50,6 +50,7 @@ def mean_ap(name_list, top, name):
     num_so_far = 0
     ap = 0
     for k, v in top:
+        k = os.path.basename(k)
         if k == name:
             continue
         num_so_far += 1
