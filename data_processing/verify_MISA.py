@@ -59,6 +59,8 @@ def generate_data(folder, arch, saved_dirname):
 
 def generate_simplified_graph(simp, folder, arch, saved_dirname, print_progress=False):
     cnt = 0
+    if not os.path.isdir(saved_dirname):
+        os.makedirs(saved_dirname)
     for f in os.listdir(folder):
         cnt += 1
         if print_progress and cnt % 100 == 0:
@@ -92,9 +94,9 @@ def main():
     parser.add_argument('--root', default=root_folder, help='Root folder de save file')
     parser.add_argument('--example_folder', default='example_graph_MISA', help='Folder de save example graph')
     parser.add_argument('--example_simplified', default='example_simplified_MISA', help='Folder de save simplified example graph')
-    parser.add_argument('--visualize', action='store_true', help='Visualize a graph')
-    parser.add_argument('--inspect', action='store_true', help='In cac basic blocks')
-    parser.add_argument('--number_of_graphs', default=2, help='So graph muon ve hoac in', type=int)
+    parser.add_argument('-v', '--visualize', action='store_true', help='Visualize a graph')
+    parser.add_argument('-i', '--inspect', action='store_true', help='In cac basic blocks')
+    parser.add_argument('-n', '--number_of_graphs', default=2, help='So graph muon ve hoac in', type=int)
     args = parser.parse_args()
 
     if args.all and args.folder:
@@ -126,7 +128,7 @@ def main():
             for name, data in islice(fns.items(), args.number_of_graphs):
                 for node in data.nodes(data='data'):
                     print(node[1])
-                    sb = simp.simplify(node[1], arch)
+                    sb = simp.simplify(node[1], args.arch)
                     print(sb)
 
 
