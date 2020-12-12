@@ -195,6 +195,7 @@ python3 plot_confusion.py --file detect.txt --task detect
 ### Classify data
 
 Ve hinh confusion matrix cho ket qua phan loai
+
 ``` shell
 python3 plot_confusion.py --file vs_experiment_1000.txt --task classify
 ```
