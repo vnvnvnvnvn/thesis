@@ -60,22 +60,97 @@ python3 read_VS.py --file ls.json
 
 ## Labeling basic blocks
 
-``` shell
-python3 make_transformer.py <vocab_file> <number_of_bits> <number_of_sublabels>
+Generate the random projection matrix used for LSH
 
+``` shell
+python3 make_transformer.py -v vs_word_file -b 32 -n vs_transformer
+```
+Tao database 2001 files de kiem tra
+
+``` shell
+python3 verify_hash.py --folder simp_vsgraphs --database lsh_vs.pkl -n 2001 --nested --vocab vs_word_file --transformer vs_transformer.npy
 ```
 
-Generate the random projection matrix used for LSH
+Kiem tra precision-recall va F1 score tinh tu database tren
+
+``` shell
+python3 verify_hash.py --database lsh_vs.pkl -s 0.95 --vocab vs_word_file --transformer vs_transformer.npy
+```
+Muon kiem tra cac label size khac thi chay lai buoc tao transformer voi so bit muon thu, roi chi can chay lai phan kiem tra (database khong bi anh huong boi so bit)
 
 ## WL
 
-``` shell
-python3 calculate_wl.py <simplified_graph_folder> [database_name] [vocab_file] [transformer_file]
-
-```
 Using the random projection matrix generated from the previous step and simplified graphs from data generation step, calculate hash from WL for all files in a folder and save them to a database
 
+Vi du sau tao ra database cho classify, voi 10000 files
+``` shell
+python3 calculate_wl.py -f simplified_vsgraphs -d vs_db_32_1.pkl -n 10000 --nested -v vs_word_file -t vs_transformer.npy
+
+```
+
+Vi du sau tao ra database cho detect, voi 12000 files
+``` shell
+python3 calculate_wl.py -f simplified_vsgraphs --benign -d benign_db_32_1.pkl -n 12000 --nested -v vs_word_file -t vs_transformer.npy
+
+```
+
+Vi du sau in WL hash cho mot so file
+
+``` shell
+python3 calculate_wl.py --file example_simplified_MISA/dwarf_add64_1 --file example_simplified_MISA/dwarf_add_abbrev_1 -v word_file_x86 -t x86_transformer.npy
+```
+
+Neu muon chay TF-IDF can tao ra database cho phuong phap do nhu sau
+
+``` shell
+python3 label_tf_idf.py --core benign_db_32_1
+```
+
+Chay thi nghiem voi cac database da tao ra nhu sau (1000 queries nhu trong vs_experiment_1000.txt)
+
+``` shell
+python3 run_wl_experiments.py -q 1000 --core vs_db_32_1 -t classify -d iou -f classify.txt -v
+
+```
+``` shell
+python3 run_wl_experiments.py -q 1000 --core vs_db_32_1_normed -t classify -d idf -f classify.txt -v
+
+```
+Ket qua se duoc viet vao file `classify.txt`. Tuong tu voi cac task khac
+
+Huong dan visualize ket qua o phan Visualize.
+
 ## GED
+
+Tao ra graph data GED co the dung nhu sau
+
+``` shell
+python3 test_ged.py -f simp_graphs/x86 -g ged_misa_x86 -d wl_data/misa_db_x86_32_1.pkl -v word_file_x86 -t x86_transformer
+```
+Kiem tra la GED co hoat dong
+
+``` shell
+python3 test_ged.py --test -f example_simplified_MISA -v word_file_x86 -t x86_transformer.npy
+
+```
+
+Chay task retrieval dung GED
+
+``` shell
+python3 test_ged.py -d wl_data/misa_db_x86_32_1.pkl -g ged_misa_x86 -q 5 -n 10
+```
+
+Co the doc huong dan chi tiet hon bang cach chay
+
+``` shell
+python3 test_ged.py -h
+```
+
+So sanh giua GA va non-GA
+
+``` shell
+python3 ga_ged.py --folder ged_misa_arm -n 10
+```
 
 ## Visualize
 ### Graph
