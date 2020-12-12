@@ -47,6 +47,7 @@ def process_retrieve_data(f, data, test_data, ged=None, neighbors=10):
     result_list = {}
 
     for k, v in test_data:
+        k = os.path.basename(k)
         start = time.time()
         closest_k = top_distance(f, data, v, neighbors)
 
