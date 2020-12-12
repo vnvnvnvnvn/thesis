@@ -36,7 +36,7 @@ def process_graph(g):
         node[1]['idx'] = idx
     return g
 
-def test_run(fn, folder, min_node=15, max_node=20):
+def test_run(fn, folder, min_node=3, max_node=20):
     file_list = [os.path.join(folder, x) for x in os.listdir(folder)]
     cnt = 2
     name = []
