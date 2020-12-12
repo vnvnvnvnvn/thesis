@@ -55,6 +55,7 @@ def process_retrieve_data(f, data, test_data, ged=None, neighbors=10):
             ged_g1 = nx.read_gpickle(os.path.join(ged, k))
             ged_order = {}
             for cand, dist in closest_k:
+                cand = os.path.basename(cand)
                 ged_g2 = nx.read_gpickle(os.path.join(ged, cand))
                 ged_dist, _, _ = ga(ged_g1, ged_g2, 1)
                 ged_order[cand] = ged_dist
