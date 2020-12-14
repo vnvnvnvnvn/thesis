@@ -212,7 +212,8 @@ def main():
         for name in args.file:
             g = nx.read_gpickle(name)
             wl = calculate_wl(g, args.loop)
-            print(wl)
+            for key, value in wl.items():
+                print(str(key)+":\t"+str(value))
 
 
 if __name__=='__main__':
